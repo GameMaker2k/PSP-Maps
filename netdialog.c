@@ -37,7 +37,7 @@ static int running = 1;
 /* Exit callback */
 int exit_callback(int arg1, int arg2, void *common)
 {
-	running = 0;
+	quit();
 	return 0;
 }
 
