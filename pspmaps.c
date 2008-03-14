@@ -23,22 +23,30 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include <SDL.h>
 #include <SDL_image.h>
 #include <SDL_rotozoom.h>
 #include <curl/curl.h>
 
-#define VERSION "0.3"
+#define VERSION "0.4"
 #define BLANK SDL_MapRGB(screen->format, 0, 0, 0)
 #define WIDTH 480
 #define HEIGHT 272
 #define BPP 32
 #define BUFFER_SIZE 100 * 1024
-#define CACHE_SIZE 32
+#define MEMORY_CACHE_SIZE 32
+#define DISK_CACHE_SIZE 1000
 #define DIGITAL_STEP 0.5
 #define JOYSTICK_STEP 0.05
 #define NUM_FAVORITES 9
+
+#ifdef _PSP_FW_VERSION
+#define DEBUG(x...) {}
+#else
+#define DEBUG(x...) printf(x);
+#endif
 
 #ifdef _PSP_FW_VERSION
 #include <pspkernel.h>
@@ -55,21 +63,37 @@ void quit();
 #endif
 
 SDL_Surface *screen, *prev, *next;
-SDL_Surface *logo, *loading, *font;
+SDL_Surface *logo, *loading, *font, *na;
+SDL_Joystick *joystick;
+char response[BUFFER_SIZE];
 int z = 16, s = 0;
 float x = 1, y = 1, dx, dy;
 CURL *curl;
 
-/* cache in RAM, for recent history and smooth moves */
-struct _cache
+/* cache in memory, for recent history and smooth moves */
+struct
 {
 	int x, y, z, s;
 	SDL_Surface *tile;
-} cache[CACHE_SIZE];
-int cur = 0;
+} memory[MEMORY_CACHE_SIZE];
+int memory_idx = 0;
+
+/* cache on disk, for offline browsing and to limit requests */
+struct
+{
+	int x, y, z, s;
+} disk[DISK_CACHE_SIZE];
+int disk_idx = 0;
+
+/* user's configuration */
+struct
+{
+	int use_disk_cache;
+	int use_effects;
+} config;
 
 /* user's favorite places */
-struct _favorite
+struct
 {
 	float x, y;
 	int z, s;
@@ -122,6 +146,21 @@ void quit()
 {
 	FILE *f;
 	
+	/* save disk cache */
+	if ((f = fopen("disk.dat", "wb")) != NULL)
+	{
+		fwrite(&disk_idx, sizeof(disk_idx), 1, f);
+		fwrite(disk, sizeof(disk), 1, f);
+		fclose(f);
+	}
+	
+	/* save configuration */
+	if ((f = fopen("config.dat", "wb")) != NULL)
+	{
+		fwrite(&config, sizeof(config), 1, f);
+		fclose(f);
+	}
+	
 	/* save favorites */
 	if ((f = fopen("favorite.dat", "wb")) != NULL)
 	{
@@ -172,6 +211,53 @@ void sattile(int x, int y, int z, char *b)
 	b[0] = 't';
 }
 
+/* save tile in memory cache */
+void savememory(int x, int y, int z, int s, SDL_Surface *tile)
+{
+	DEBUG("savememory(%d, %d, %d, %d)\n", x, y, z, s);
+	SDL_FreeSurface(memory[memory_idx].tile);
+	memory[memory_idx].x = x;
+	memory[memory_idx].y = y;
+	memory[memory_idx].z = z;
+	memory[memory_idx].s = s;
+	memory[memory_idx].tile = tile;
+	memory_idx = (memory_idx + 1) % MEMORY_CACHE_SIZE;
+}
+
+/* save tile in disk cache */
+void savedisk(int x, int y, int z, int s, SDL_RWops *rw, int n)
+{
+	FILE *f;
+	char name[50];
+	char buffer[BUFFER_SIZE];
+	
+	if (!config.use_disk_cache) return;
+	
+	DEBUG("savedisk(%d, %d, %d, %d)\n", x, y, z, s);
+	
+	if (rw == NULL)
+	{
+		printf("warning: savedisk(NULL)!\n");
+		return;
+	}
+	
+	disk[disk_idx].x = x;
+	disk[disk_idx].y = y;
+	disk[disk_idx].z = z;
+	disk[disk_idx].s = s;
+	
+	SDL_RWseek(rw, 0, SEEK_SET);
+	sprintf(name, "cache/%d.dat", disk_idx);
+	if ((f = fopen(name, "wb")) != NULL)
+	{
+		SDL_RWread(rw, buffer, 1, n);
+		fwrite(buffer, 1, n, f);
+		fclose(f);
+	}
+	
+	disk_idx = (disk_idx + 1) % DISK_CACHE_SIZE;
+}
+
 /* curl callback to save in memory */
 size_t curl_write(void *ptr, size_t size, size_t nb, SDL_RWops *rw)
 {
@@ -180,25 +266,13 @@ size_t curl_write(void *ptr, size_t size, size_t nb, SDL_RWops *rw)
 	return t;
 }
 
-/* return the tile from cache if available, or NULL */
-SDL_Surface *getcache(int x, int y, int z, int s)
+/* get the image on internet and return a buffer */
+SDL_RWops *getnet(int x, int y, int z, int s)
 {
-	int i;
-	for (i = 0; i < CACHE_SIZE; i++)
-		if (cache[i].tile && cache[i].x == x && cache[i].y == y && cache[i].z == z && cache[i].s == s)
-			return cache[i].tile;
-	return NULL;
-}
-
-/* downloads the image from Google for location (x,y,z) with mode (s) */
-SDL_Surface* gettile(int x, int y, int z, int s)
-{
-	char request[1024], response[BUFFER_SIZE];
+	char request[1024];
 	SDL_RWops *rw;
-	SDL_Surface *tmp;
 	
-	if ((tmp = getcache(x, y, z, s)) != NULL)
-		return tmp;
+	DEBUG("getnet(%d, %d, %d, %d)\n", x, y, z, s);
 	
 	switch (s)
 	{
@@ -209,7 +283,7 @@ SDL_Surface* gettile(int x, int y, int z, int s)
 			sprintf(request, "http://mt0.google.com/mt?n=404&v=w2p.64&x=%d&y=%d&zoom=%d", x, y, z);
 			break;
 		case GG_SATELLITE:
-			sprintf(request, "http://kh0.google.com/kh?n=404&v=20&t=");
+			sprintf(request, "http://kh0.google.com/kh?n=404&v=25&t=");
 			sattile(x, y, z, request + strlen(request));
 			break;
 	}
@@ -223,18 +297,79 @@ SDL_Surface* gettile(int x, int y, int z, int s)
 	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10);
 	curl_easy_perform(curl);
 	
-	rw->seek(rw, 0, SEEK_SET);
-	tmp = IMG_Load_RW(rw, 1);
+	return rw;
+}
+
+/* return the tile from disk if available, or NULL */
+SDL_Surface *getdisk(int x, int y, int z, int s)
+{
+	int i;
+	char name[50];
+	DEBUG("getdisk(%d, %d, %d, %d)\n", x, y, z, s);
+	for (i = 0; i < DISK_CACHE_SIZE; i++)
+		if (disk[i].x == x && disk[i].y == y && disk[i].z == z && disk[i].s == s)
+		{
+			sprintf(name, "cache/%d.dat", i);
+			return IMG_Load(name);
+		}
+	return NULL;
+}
+
+/* return the tile from memory if available, or NULL */
+SDL_Surface *getmemory(int x, int y, int z, int s)
+{
+	int i;
+	DEBUG("getmemory(%d, %d, %d, %d)\n", x, y, z, s);
+	for (i = 0; i < MEMORY_CACHE_SIZE; i++)
+		if (memory[i].tile && memory[i].x == x && memory[i].y == y && memory[i].z == z && memory[i].s == s)
+			return memory[i].tile;
+	return NULL;
+}
+
+/* downloads the image from Google for location (x,y,z) with mode (s) */
+SDL_Surface* gettile(int x, int y, int z, int s)
+{
+	SDL_RWops *rw;
+	SDL_Surface *tile;
+	int n;
 	
-	SDL_FreeSurface(cache[cur].tile);
-	cache[cur].x = x;
-	cache[cur].y = y;
-	cache[cur].z = z;
-	cache[cur].s = s;
-	cache[cur].tile = tmp;
-	cur = (cur + 1) % CACHE_SIZE;
+	/* try memory cache */
+	if ((tile = getmemory(x, y, z, s)) != NULL)
+		return tile;
 	
-	return tmp;
+	/* try disk cache */
+	if ((tile = getdisk(x, y, z, s)) != NULL)
+	{
+		if (tile == NULL)
+			tile = zoomSurface(na, 1, 1, 0);
+		savememory(x, y, z, s, tile);
+		return tile;
+	}
+	
+	/* try internet */
+	rw = getnet(x, y, z, s);
+	
+	/* load the image */
+	n = SDL_RWtell(rw);
+	SDL_RWseek(rw, 0, SEEK_SET);
+	tile = IMG_Load_RW(rw, 0);
+	SDL_RWseek(rw, 0, SEEK_SET);
+	
+	/* if there is no tile, copy the n/a image
+	 * I use a dummy call to zoomSurface to copy the surface
+	 * because I had issues with SDL_DisplayFormat() on PSP */
+	if (tile == NULL)
+		tile = zoomSurface(na, 1, 1, 0);
+	/* only save on disk if not n/a
+	 * to avoid filling the cache with wrong images
+	 * when we are offline */
+	else
+		savedisk(x, y, z, s, rw, n);
+	savememory(x, y, z, s, tile);
+	
+	SDL_RWclose(rw);
+	
+	return tile;
 }
 
 /* fx for transition between prev and next screen */
@@ -244,6 +379,8 @@ void effect(int fx)
 	SDL_Rect r;
 	int i;
 	float t;
+	
+	if (!config.use_effects) return;
 	
 	/* effects */
 	switch (fx)
@@ -356,7 +493,7 @@ void effect(int fx)
 /* updates the display */
 void display(int fx)
 {
-	SDL_Surface *tmp;
+	SDL_Surface *tile;
 	SDL_Rect r;
 	int i, j, ok;
 	
@@ -370,11 +507,11 @@ void display(int fx)
 	/* save the old screen */
 	SDL_BlitSurface(next, NULL, prev, NULL);
 	
-	/* check if everything is in cache */
+	/* check if everything is in memory cache */
 	ok = 1;
 	for (j = y-1; j < y+1; j++)
 		for (i = x-1; i < x+1; i++)
-			if (!getcache(i, j, z, s))
+			if (!getmemory(i, j, z, s))
 				ok = 0;
 	
 	/* if not, display loading notice */
@@ -393,8 +530,8 @@ void display(int fx)
 		{
 			r.x = WIDTH/2 + (i-x)*256;
 			r.y = HEIGHT/2 + (j-y)*256;
-			tmp = gettile(i, j, z, s);
-			SDL_BlitSurface(tmp, NULL, next, &r);
+			tile = gettile(i, j, z, s);
+			SDL_BlitSurface(tile, NULL, next, &r);
 		}
 	
 	/* nicer transition */
@@ -428,27 +565,31 @@ void print(SDL_Surface *dst, int x, int y, char *text)
 void menu()
 {
 	SDL_Event event;
-	int flags, active = 0, fav = 0;
-	#define MENU_OPTIONS 5
+	int action, active = 0, fav = 0;
+	#define MENU_OPTIONS 7
 
 	void update()
 	{
-		char temp[20];
+		char temp[50];
 		SDL_Rect pos;
 		SDL_FillRect(next, NULL, BLANK);
 		pos.x = 70;
 		pos.y = 0;
 		SDL_BlitSurface(logo, NULL, next, &pos);
 		print(next, 280, 30, "version " VERSION);
-		print(next, 120, HEIGHT/(MENU_OPTIONS+5)*(3+active), ">");
+		print(next, 120, HEIGHT/(MENU_OPTIONS+4)*(3+active), ">");
 		sprintf(temp, "Load favorite: %d", fav+1);
-		print(next, 140, HEIGHT/(MENU_OPTIONS+5)*3, temp);
+		print(next, 140, HEIGHT/(MENU_OPTIONS+4)*3, temp);
 		sprintf(temp, "Save favorite: %d", fav+1);
-		print(next, 140, HEIGHT/(MENU_OPTIONS+5)*4, temp);
-		print(next, 140, HEIGHT/(MENU_OPTIONS+5)*5, "Default view");
-		print(next, 140, HEIGHT/(MENU_OPTIONS+5)*6, "Exit menu");
-		print(next, 140, HEIGHT/(MENU_OPTIONS+5)*7, "Quit PSP-Maps");
-		print(next, 90, HEIGHT/(MENU_OPTIONS+5)*9, "http://royale.zerezo.com/psp/");
+		print(next, 140, HEIGHT/(MENU_OPTIONS+4)*4, temp);
+		print(next, 140, HEIGHT/(MENU_OPTIONS+4)*5, "Default view");
+		sprintf(temp, "Disk cache: %s", config.use_disk_cache ? "Yes" : "No");
+		print(next, 140, HEIGHT/(MENU_OPTIONS+4)*6, temp);
+		sprintf(temp, "Transition effects: %s", config.use_effects ? "Yes" : "No");
+		print(next, 140, HEIGHT/(MENU_OPTIONS+4)*7, temp);
+		print(next, 140, HEIGHT/(MENU_OPTIONS+4)*8, "Exit menu");
+		print(next, 140, HEIGHT/(MENU_OPTIONS+4)*9, "Quit PSP-Maps");
+		print(next, 90, HEIGHT/(MENU_OPTIONS+4)*10.4, "http://royale.zerezo.com/psp/");
 		SDL_BlitSurface(next, NULL, screen, NULL);
 		SDL_Flip(screen);
 	}
@@ -466,10 +607,10 @@ void menu()
 				case SDL_KEYDOWN:
 				case SDL_JOYBUTTONDOWN:
 					if (event.type == SDL_KEYDOWN)
-						flags = event.key.keysym.sym;
+						action = event.key.keysym.sym;
 					else
-						flags = event.jbutton.button;
-					switch (flags)
+						action = event.jbutton.button;
+					switch (action)
 					{
 						case SDLK_ESCAPE:
 						case PSP_BUTTON_START:
@@ -506,11 +647,19 @@ void menu()
 									z = 16;
 									s = 0;
 									return;
-								/* exit menu */
+								/* disk cache */
 								case 3:
+									config.use_disk_cache = !config.use_disk_cache;
+									break;
+								/* effects */
+								case 4:
+									config.use_effects = !config.use_effects;
+									break;
+								/* exit menu */
+								case 5:
 									return;
 								/* quit PSP-Maps */
-								case 4:
+								case 6:
 									quit();
 							}
 							update();
@@ -518,15 +667,45 @@ void menu()
 						case SDLK_LEFT:
 						case PSP_BUTTON_LEFT:
 						case PSP_BUTTON_L:
-							fav--;
-							if (fav < 0) fav = NUM_FAVORITES-1;
+							switch (active)
+							{
+								/* favorites */
+								case 0:
+								case 1:
+									fav--;
+									if (fav < 0) fav = NUM_FAVORITES-1;
+									break;
+								/* disk cache */
+								case 3:
+									config.use_disk_cache = !config.use_disk_cache;
+									break;
+								/* effects */
+								case 4:
+									config.use_effects = !config.use_effects;
+									break;
+							}
 							update();
 							break;
 						case SDLK_RIGHT:
 						case PSP_BUTTON_RIGHT:
 						case PSP_BUTTON_R:
-							fav++;
-							if (fav > NUM_FAVORITES-1) fav = 0;
+							switch (active)
+							{
+								/* favorites */
+								case 0:
+								case 1:
+									fav++;
+									if (fav > NUM_FAVORITES-1) fav = 0;
+									break;
+								/* disk cache */
+								case 3:
+									config.use_disk_cache = !config.use_disk_cache;
+									break;
+								/* effects */
+								case 4:
+									config.use_effects = !config.use_effects;
+									break;
+							}
 							update();
 							break;
 						case SDLK_UP:
@@ -551,24 +730,45 @@ void menu()
 	}
 }
 
-/* init and main loop */
-void go()
+/* init */
+void init()
 {
 	int flags;
-	SDL_Event event;
-	SDL_Joystick *joystick;
 	FILE *f;
 	
 	/* clear cache */
-	bzero(cache, sizeof(cache));
+	bzero(memory, sizeof(memory));
+	
+	/* load disk cache if available */
+	bzero(disk, sizeof(disk));
+	if ((f = fopen("disk.dat", "rb")) != NULL)
+	{
+		fread(&disk_idx, sizeof(disk_idx), 1, f);
+		fread(disk, sizeof(disk), 1, f);
+		fclose(f);
+	}
+	
+	/* create disk cache directory if needed */
+	mkdir("cache", 0755);
+	
+	/* default options */
+	config.use_disk_cache = 1;
+	config.use_effects = 1;
+	
+	/* load configuration if available */
+	if ((f = fopen("config.dat", "rb")) != NULL)
+	{
+		fread(&config, sizeof(config), 1, f);
+		fclose(f);
+	}
 	
 	/* load favorites if available */
 	bzero(favorite, sizeof(favorite));
-	if ((f = fopen("favorite.dat", "r")) != NULL)
+	if ((f = fopen("favorite.dat", "rb")) != NULL)
 	{
 		fread(favorite, sizeof(favorite), 1, f);
 		fclose(f);
-	}	
+	}
 	
 	/* setup curl */
 	curl = curl_easy_init();
@@ -592,9 +792,17 @@ void go()
 	logo = IMG_Load("logo.png");
 	loading = IMG_Load("loading.png");
 	font = IMG_Load("font.png");
+	na = IMG_Load("na.png");
 	
 	/* display initial map */
 	display(FX_FADE);
+}
+
+/* main loop */
+void loop()
+{
+	int action;
+	SDL_Event event;
 	
 	/* main loop */
 	while (1)
@@ -609,10 +817,10 @@ void go()
 				case SDL_KEYDOWN:
 				case SDL_JOYBUTTONDOWN:
 					if (event.type == SDL_KEYDOWN)
-						flags = event.key.keysym.sym;
+						action = event.key.keysym.sym;
 					else
-						flags = event.jbutton.button;
-					switch (flags)
+						action = event.jbutton.button;
+					switch (action)
 					{
 						case SDLK_LEFT:
 						case PSP_BUTTON_LEFT:
@@ -702,6 +910,7 @@ int main(void)
 	setupGu();
 	netDialog();
 	#endif
-	go();
+	init();
+	loop();
 	return 0;
 }

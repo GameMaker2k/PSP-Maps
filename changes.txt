@@ -1,0 +1,23 @@
+Change log file for PSP-Maps
+
+version 0.4	(2008-03-15)
+	* added a cache on the memory stick
+	* allows offline browsing of maps in the cache
+	* added a configuration file
+	* added options to disable disk cache and transition effects
+	* added an error image when view is not available
+	* better zoom level (thanks to elefas for the tip)
+
+version 0.3	(2008-03-13)
+	* added a menu to load/save favorites
+	* some nicer effects (zoom/unzoom, fade in/out, scrolling)
+	* removed the ugly splash screen
+
+version 0.2	(2008-03-11)
+	* added a menu to select wireless connection
+	* the map loads faster
+	* you can now use the analog stick for smooth moves
+	* added a cache to go back quickly to the previous views
+
+version 0.1	(2008-03-03)
+	* initial version
