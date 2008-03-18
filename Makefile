@@ -21,7 +21,7 @@ PSPBIN = $(PSPSDK)/../bin
 
 CFLAGS += -I/usr/local/pspdev/psp/include/SDL $(shell $(PSPBIN)/curl-config --cflags)
 
-LIBS = -lc -lSDL_image -lSDL_gfx -lpng -ljpeg -lSDL -lcurl
+LIBS = -lc -lSDL_image -lSDL_gfx -lSDL_ttf -lpng -ljpeg -lSDL -lcurl -lfreetype
 LIBS += $(shell $(PSPBIN)/sdl-config --libs)
 LIBS += $(shell $(PSPBIN)/curl-config --libs)
 LIBS +=  -lpspwlan -lpsputility -lpspgum -lpspgu -lm

@@ -1,7 +1,7 @@
 CFLAGS = -Wall -O2 -g
 SDLCONFIG = sdl-config
 CURLCONFIG = curl-config
-LIBS = -lSDL_image -lSDL_gfx
+LIBS = -lSDL_image -lSDL_gfx -lSDL_ttf
 
 pspmaps: pspmaps.c
 	$(CC) $(CFLAGS) -o pspmaps pspmaps.c $(LIBS) `$(CURLCONFIG) --cflags --libs` `$(SDLCONFIG) --cflags --libs`

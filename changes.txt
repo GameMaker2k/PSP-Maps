@@ -1,5 +1,14 @@
 Change log file for PSP-Maps
 
+version 0.5	(2008-03-19)
+	* added Virtual Earth and Yahoo! Maps support (thanks to boomerang for the idea)
+	* address search menu
+	* customizable cache size
+	* added an option to load neighborhood to cache
+	* switched to TTF font
+	* fixed a bug with favorites
+	* new buttons mapping
+
 version 0.4	(2008-03-15)
 	* added a cache on the memory stick
 	* allows offline browsing of maps in the cache
