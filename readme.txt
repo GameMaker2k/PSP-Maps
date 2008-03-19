@@ -9,9 +9,10 @@ Controls:
 	* Analog pad: move smoothly the map.
 	* R button: zoom in.
 	* L button: zoom out.
+	* >< button: next view.
+	* [] button: previous view.
 	* /\ button: go to address.
-	* X and [] buttons: next view.
-	* O button: previous view
+	* () button: show/hide zoom help.
 	* Start: menu.
 
 Offline browsing:

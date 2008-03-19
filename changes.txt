@@ -1,5 +1,11 @@
 Change log file for PSP-Maps
 
+version 0.6	(2008-03-20)
+	* added splash screen for the NEO Spring coding contest 2008
+	* added a progress bar when shrinking the cache
+	* added an image to help zoom in (show/hide with button O)
+	* updated the Makefile to remove old version number
+
 version 0.5	(2008-03-19)
 	* added Virtual Earth and Yahoo! Maps support (thanks to boomerang for the idea)
 	* address search menu

@@ -33,7 +33,7 @@
 #include <SDL_ttf.h>
 #include <curl/curl.h>
 
-#define VERSION "0.5"
+#define VERSION "0.6"
 #define WIDTH 480
 #define HEIGHT 272
 #define BPP 32
@@ -67,7 +67,7 @@ void quit();
 #endif
 
 SDL_Surface *screen, *prev, *next;
-SDL_Surface *logo, *na;
+SDL_Surface *logo, *na, *zoom;
 SDL_Joystick *joystick;
 TTF_Font *font;
 CURL *curl;
@@ -102,6 +102,7 @@ struct
 {
 	int cache_size;
 	int use_effects;
+	int show_zoom;
 } config;
 
 /* user's favorite places */
@@ -775,6 +776,15 @@ void display(int fx)
 	
 	/* restore the good screen */
 	SDL_BlitSurface(next, NULL, screen, NULL);
+	
+	/* show zoomer */
+	if (config.show_zoom)
+	{
+		r.x = WIDTH/2 - 120;
+		r.y = HEIGHT/2 - 68;
+		SDL_BlitSurface(zoom, NULL, screen, &r);
+	}
+	
 	SDL_Flip(screen);
 }
 
@@ -951,15 +961,21 @@ void menu()
 								case 6:
 									if (config.cache_size != cache_size)
 									{
-										int i, old;
+										int old;
 										old = config.cache_size;
 										config.cache_size = cache_size;
 										/* remove data on disk if needed */
-										for (i = config.cache_size; i < old; i++)
+										box(next, 400, 70, 200);
+										print(next, 50, HEIGHT/2 - 30, "Cleaning cache...");
+										for (i = config.cache_size; i < disk_idx; i++)
 										{
 											char name[50];
+											float ratio = 1.0 * (i - config.cache_size) / (disk_idx - config.cache_size);
+											boxRGBA(next, WIDTH/2 - 180, HEIGHT/2, WIDTH/2 - 180 + 360.0 * ratio, HEIGHT/2 + 15, 255, 0, 0, 255);
 											sprintf(name, "cache/%d.dat", i);
 											unlink(name);
+											SDL_BlitSurface(next, NULL, screen, NULL);
+											SDL_Flip(screen);
 										}
 										disk = realloc(disk, sizeof(struct _disk) * config.cache_size);
 										/* clear newly allocated memory if needed */
@@ -1068,6 +1084,7 @@ void init()
 	/* default options */
 	config.cache_size = 1600;
 	config.use_effects = 1;
+	config.show_zoom = 0;
 	
 	/* load configuration if available */
 	if ((f = fopen("config.dat", "rb")) != NULL)
@@ -1119,9 +1136,18 @@ void init()
 	if (screen == NULL)
 		quit();
 	
+	/* splash screen */
+	logo = IMG_Load("contest.png");
+	SDL_BlitSurface(logo, NULL, next, NULL);
+	SDL_FreeSurface(logo);
+	SDL_BlitSurface(next, NULL, screen, NULL);
+	effect(FX_FADE);
+	SDL_Delay(1500);
+	
 	/* load textures */
 	logo = IMG_Load("logo.png");
 	na = IMG_Load("na.png");
+	zoom = IMG_Load("zoom.png");
 	font = TTF_OpenFont("font.ttf", 12);
 	
 	/* display initial map */
@@ -1198,17 +1224,21 @@ void loop()
 							display(FX_FADE);
 							break;
 						case SDLK_LALT:
-						case PSP_BUTTON_B:
+						case PSP_BUTTON_X:
 							s--;
 							if (s < 0) s = NUM_VIEWS-1;
 							display(FX_FADE);
 							break;
 						case SDLK_SPACE:
 						case PSP_BUTTON_A:
-						case PSP_BUTTON_X:
 							s++;
 							if (s > NUM_VIEWS-1) s = 0;
 							display(FX_FADE);
+							break;
+						case SDLK_RCTRL:
+						case PSP_BUTTON_B:
+							config.show_zoom = !config.show_zoom;
+							display(FX_NONE);
 							break;
 						case SDLK_ESCAPE:
 						case PSP_BUTTON_START:
