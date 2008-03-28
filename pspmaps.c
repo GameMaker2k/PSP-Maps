@@ -33,7 +33,7 @@
 #include <SDL_ttf.h>
 #include <curl/curl.h>
 
-#define VERSION "0.6"
+#define VERSION "0.7"
 #define WIDTH 480
 #define HEIGHT 272
 #define BPP 32
@@ -41,6 +41,7 @@
 #define MEMORY_CACHE_SIZE 32
 #define DIGITAL_STEP 0.5
 #define JOYSTICK_STEP 0.05
+#define JOYSTICK_DEAD 10000
 #define NUM_FAVORITES 9
 
 #define BLACK SDL_MapRGB(screen->format, 0, 0, 0)
@@ -66,6 +67,11 @@ void quit();
 #include "netdialog.c"
 #endif
 
+#ifdef _WIN32
+#define bzero(P, N) memset(P, 0, N)
+#define mkdir(D, M) mkdir(D)
+#endif
+
 SDL_Surface *screen, *prev, *next;
 SDL_Surface *logo, *na, *zoom;
 SDL_Joystick *joystick;
@@ -76,6 +82,7 @@ char response[BUFFER_SIZE];
 /* x, y, z are in Google's format: z = [ -4 .. 16 ], x and y = [ 1 .. 2^(17-z) ] */
 int z = 16, s = 0;
 float x = 1, y = 1, dx, dy;
+int active = 0, fav = 0, balancing = 0;
 
 /* cache in memory, for recent history and smooth moves */
 struct
@@ -102,7 +109,7 @@ struct
 {
 	int cache_size;
 	int use_effects;
-	int show_zoom;
+	int show_info;
 } config;
 
 /* user's favorite places */
@@ -118,24 +125,31 @@ enum
 {
 	GG_MAP,
 	GG_SATELLITE,
+	GG_HYBRID,
 	GG_TERRAIN,
 	VE_ROAD,
 	VE_AERIAL,
 	VE_HYBRID,
+	VE_HILL,
 	YH_MAP,
 	YH_SATELLITE,
+	YH_HYBRID,
 	NUM_VIEWS
 };
 
+/* legend for view types */
 char *_view[NUM_VIEWS] = {
 	"Google Maps / Map",
 	"Google Maps / Satellite",
+	"Google Maps / Hybrid",
 	"Google Maps / Terrain",
 	"Virtual Earth / Road",
 	"Virtual Earth / Aerial",
 	"Virtual Earth / Hybrid",
+	"Virtual Earth / Hill",
 	"Yahoo! Maps / Map",
-	"Yahoo! Maps / Satellite"
+	"Yahoo! Maps / Satellite",
+	"Yahoo! Maps / Hybrid"
 };
 
 /* PSP buttons list */
@@ -168,6 +182,23 @@ enum
 	FX_OUT,
 	FX_FADE,
 	FX_NUM
+};
+
+/* entries in the menu */
+enum
+{
+	MENU_VIEW,
+	MENU_ADDRESS,
+	MENU_LOAD,
+	MENU_SAVE,
+	MENU_DEFAULT,
+	MENU_INFO,
+	MENU_EFFECT,
+	MENU_RADIUS,
+	MENU_CACHE,
+	MENU_EXIT,
+	MENU_QUIT,
+	MENU_NUM
 };
 
 /* quit */
@@ -333,14 +364,17 @@ SDL_RWops *getnet(int x, int y, int z, int s)
 	switch (s)
 	{
 		case GG_MAP:
-			sprintf(request, "http://mt0.google.com/mt?n=404&v=w2.69&x=%d&y=%d&zoom=%d", x, y, z);
-			break;
-		case GG_TERRAIN:
-			sprintf(request, "http://mt0.google.com/mt?n=404&v=w2p.64&x=%d&y=%d&zoom=%d", x, y, z);
+			sprintf(request, "http://mt%d.google.com/mt?n=404&v=w2.69&x=%d&y=%d&zoom=%d", ++balancing%4, x, y, z);
 			break;
 		case GG_SATELLITE:
-			sprintf(request, "http://kh0.google.com/kh?n=404&v=25&t=");
+			sprintf(request, "http://kh%d.google.com/kh?n=404&v=25&t=", ++balancing%4);
 			GGtile(x, y, z, request + strlen(request));
+			break;
+		case GG_HYBRID:
+			sprintf(request, "http://mt%d.google.com/mt?n=404&v=w2t.69&x=%d&y=%d&zoom=%d", ++balancing%4, x, y, z);
+			break;
+		case GG_TERRAIN:
+			sprintf(request, "http://mt%d.google.com/mt?n=404&v=w2p.64&x=%d&y=%d&zoom=%d", ++balancing%4, x, y, z);
 			break;
 		case VE_ROAD:
 			sprintf(request, "http://tiles.virtualearth.net/tiles/r");
@@ -357,11 +391,19 @@ SDL_RWops *getnet(int x, int y, int z, int s)
 			VEtile(x, y, z, request + strlen(request));
 			strcat(request, "?g=117");
 			break;
+		case VE_HILL:
+			sprintf(request, "http://tiles.virtualearth.net/tiles/r");
+			VEtile(x, y, z, request + strlen(request));
+			strcat(request, "?g=117&shading=hill");
+			break;
 		case YH_MAP:
 			sprintf(request, "http://us.maps1.yimg.com/us.tile.yimg.com/tl?v=4.1&x=%d&y=%d&z=%d", x, (int) pow(2, 16-z)-y-1, z+1);
 			break;
 		case YH_SATELLITE:
 			sprintf(request, "http://us.maps3.yimg.com/aerial.maps.yimg.com/ximg?v=1.7&t=a&x=%d&y=%d&z=%d", x, (int) pow(2, 16-z)-y-1, z+1);
+			break;
+		case YH_HYBRID:
+			sprintf(request, "http://us.maps3.yimg.com/aerial.maps.yimg.com/ximg?v=2.5&t=p&x=%d&y=%d&z=%d", x, (int) pow(2, 16-z)-y-1, z+1);
 			break;
 	}
 	
@@ -723,6 +765,28 @@ void effect(int fx)
 	}
 }
 
+/* show informations */
+void info()
+{
+	SDL_Rect r;
+	char temp[100];
+	float lat, lon;
+	
+	/* show zoomer */
+	r.x = WIDTH/2 - 120;
+	r.y = HEIGHT/2 - 68;
+	SDL_BlitSurface(zoom, NULL, screen, &r);
+	
+	/* display useful info */
+	lon = x / pow(2, 17-z) * 360 - 180;
+	lat = y / pow(2, 17-z) * 2 * M_PI;
+	lat = atan(exp(M_PI - lat)) / M_PI * 360 - 90;
+	hlineRGBA(screen, 0, WIDTH, 16, 255, 255, 255, 255);
+	boxRGBA(screen, 0, 0, WIDTH, 15, 0, 0, 0, 200);
+	sprintf(temp, "Lat: %10.6f | Lon: %10.6f | Zoom: %3.1d%% | Type: %s", lat, lon, 100*(16-z)/20, _view[s]);
+	print(screen, 5, 0, temp);
+}
+
 /* updates the display */
 void display(int fx)
 {
@@ -765,6 +829,22 @@ void display(int fx)
 	for (j = y-1; j < y+1; j++)
 		for (i = x-1; i < x+1; i++)
 		{
+			/* special process for hybrid maps: compose 2 images */
+			r.x = WIDTH/2 + (i-x)*256;
+			r.y = HEIGHT/2 + (j-y)*256;
+			switch (s)
+			{
+				case GG_HYBRID:
+					tile = gettile(i, j, z, GG_SATELLITE);
+					SDL_BlitSurface(tile, NULL, next, &r);
+					break;
+				case YH_HYBRID:
+					tile = gettile(i, j, z, YH_SATELLITE);
+					SDL_BlitSurface(tile, NULL, next, &r);
+					break;
+			}
+			
+			/* normal process */
 			r.x = WIDTH/2 + (i-x)*256;
 			r.y = HEIGHT/2 + (j-y)*256;
 			tile = gettile(i, j, z, s);
@@ -777,13 +857,8 @@ void display(int fx)
 	/* restore the good screen */
 	SDL_BlitSurface(next, NULL, screen, NULL);
 	
-	/* show zoomer */
-	if (config.show_zoom)
-	{
-		r.x = WIDTH/2 - 120;
-		r.y = HEIGHT/2 - 68;
-		SDL_BlitSurface(zoom, NULL, screen, &r);
-	}
+	/* show informations */
+	if (config.show_info) info();
 	
 	SDL_Flip(screen);
 }
@@ -794,7 +869,7 @@ void go()
 	char request[1024], address[50];
 	SDL_RWops *rw;
 	int i, ret, code, precision;
-	float latitude, longitude;
+	float lat, lon;
 	char _zoom[9] = {
 		16,	// unknown
 		12,	// country
@@ -814,7 +889,7 @@ void go()
 	DEBUG("go(%s)\n", address);
 	
 	for (i = 0; i < strlen(address); i++) if (address[i] == ' ') address[i] = '+';
-	sprintf(request, "http://maps.google.fr/maps/geo?output=csv&key=%s&q=%s", gkey, address);
+	sprintf(request, "http://maps.google.com/maps/geo?output=csv&key=%s&q=%s", gkey, address);
 	
 	rw = SDL_RWFromMem(response, BUFFER_SIZE);
 	
@@ -826,17 +901,17 @@ void go()
 	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10);
 	curl_easy_perform(curl);
 	
-	ret = sscanf(response, "%d,%d,%f,%f", &code, &precision, &latitude, &longitude);
+	ret = sscanf(response, "%d,%d,%f,%f", &code, &precision, &lat, &lon);
 	
 	if (ret == 4 && code == 200)
 	{
-		DEBUG("precision: %d, latitude: %f, longitude: %f\n", precision, latitude, longitude);
-		float e = sin(latitude * M_PI / 180);
+		DEBUG("precision: %d, lat: %f, lon: %f\n", precision, lat, lon);
+		float e = sin(lat * M_PI / 180);
   		if (e > 0.9999) e = 0.9999;
   		if (e < -0.9999) e = -0.9999;
 		z = _zoom[precision];
-		x = pow(2, 16-z) + longitude * pow(2, 17-z) / 360;
-		y = pow(2, 16-z) + 0.5 * log((1 + e)/(1 - e)) * -1 * pow(2, 16-z) / M_PI;
+		x = pow(2, 17-z) * (lon + 180) / 360;
+		y = pow(2, 16-z) * (1 - log((1 + e)/(1 - e)) / 2 / M_PI);
 	}
 	
 	SDL_RWclose(rw);
@@ -846,12 +921,16 @@ void go()
 void menu()
 {
 	SDL_Event event;
-	int action, active = 0, fav = 0, cache_size = config.cache_size, radius = 5;
+	int action, cache_size = config.cache_size, radius = 5;
 	int i, j;
-	#define MENU_OPTIONS 9
-	#define XDEC 140
+	
+	#define MENU_LEFT 140
+	#define MENU_TOP 65
+	#define MENU_BOTTOM 30
+	#define MENU_Y (HEIGHT - MENU_TOP - MENU_BOTTOM) / MENU_NUM
 	#define MAX_RADIUS 25
-
+	#define ENTRY(position, format...) sprintf(temp, format); print(next, MENU_LEFT, MENU_TOP + position * MENU_Y, temp);
+	
 	void update()
 	{
 		char temp[50];
@@ -861,22 +940,19 @@ void menu()
 		pos.y = 0;
 		SDL_BlitSurface(logo, NULL, next, &pos);
 		print(next, 280, 30, "version " VERSION);
-		print(next, XDEC-20, HEIGHT/(MENU_OPTIONS+4)*(3+active), ">");
-		print(next, XDEC, HEIGHT/(MENU_OPTIONS+4)*3, "Enter address...");
-		sprintf(temp, "Load favorite: %d", fav+1);
-		print(next, XDEC, HEIGHT/(MENU_OPTIONS+4)*4, temp);
-		sprintf(temp, "Save favorite: %d", fav+1);
-		print(next, XDEC, HEIGHT/(MENU_OPTIONS+4)*5, temp);
-		print(next, XDEC, HEIGHT/(MENU_OPTIONS+4)*6, "Default view");
-		sprintf(temp, "Transition effects: %s", config.use_effects ? "Yes" : "No");
-		print(next, XDEC, HEIGHT/(MENU_OPTIONS+4)*7, temp);
-		sprintf(temp, "Cache neighborhood radius: %d", radius);
-		print(next, XDEC, HEIGHT/(MENU_OPTIONS+4)*8, temp);
-		sprintf(temp, "Cache size: %d (~ %d MB)", cache_size, cache_size * 20 / 1000);
-		print(next, XDEC, HEIGHT/(MENU_OPTIONS+4)*9, temp);
-		print(next, XDEC, HEIGHT/(MENU_OPTIONS+4)*10, "Exit menu");
-		print(next, XDEC, HEIGHT/(MENU_OPTIONS+4)*11, "Quit PSP-Maps");
-		print(next, 120, HEIGHT/(MENU_OPTIONS+4)*12.4, "http://royale.zerezo.com/psp/");
+		print(next, MENU_LEFT-20, MENU_TOP + active * MENU_Y, ">");
+		ENTRY(MENU_VIEW, "Current view: %s", _view[s]);
+		ENTRY(MENU_ADDRESS, "Enter address...");
+		ENTRY(MENU_LOAD, "Load favorite: %d", fav+1);
+		ENTRY(MENU_SAVE, "Save favorite: %d", fav+1);
+		ENTRY(MENU_DEFAULT, "Default view");
+		ENTRY(MENU_INFO, "Show informations: %s", config.show_info ? "Yes" : "No");
+		ENTRY(MENU_EFFECT, "Transition effects: %s", config.use_effects ? "Yes" : "No");
+		ENTRY(MENU_RADIUS, "Cache neighborhood radius: %d", radius);
+		ENTRY(MENU_CACHE, "Cache size: %d (~ %d MB)", cache_size, cache_size * 20 / 1000);
+		ENTRY(MENU_EXIT, "Exit menu");
+		ENTRY(MENU_QUIT, "Quit PSP-Maps");
+		print(next, 120, 250, "http://royale.zerezo.com/psp/");
 		SDL_BlitSurface(next, NULL, screen, NULL);
 		SDL_Flip(screen);
 	}
@@ -911,11 +987,11 @@ void menu()
 							switch (active)
 							{
 								/* enter address */
-								case 0:
+								case MENU_ADDRESS:
 									go();
 									return;
 								/* load favorite */
-								case 1:
+								case MENU_LOAD:
 									if (favorite[fav].ok)
 									{
 										x = favorite[fav].x;
@@ -925,7 +1001,7 @@ void menu()
 									}
 									return;
 								/* save favorite */
-								case 2:
+								case MENU_SAVE:
 									favorite[fav].ok = 1;
 									favorite[fav].x = x;
 									favorite[fav].y = y;
@@ -933,18 +1009,22 @@ void menu()
 									favorite[fav].s = s;
 									return;
 								/* default view */
-								case 3:
+								case MENU_DEFAULT:
 									x = 1;
 									y = 1;
 									z = 16;
 									s = 0;
 									return;
+								/* infos */
+								case MENU_INFO:
+									config.show_info = !config.show_info;
+									break;
 								/* effects */
-								case 4:
+								case MENU_EFFECT:
 									config.use_effects = !config.use_effects;
 									break;
 								/* radius */
-								case 5:
+								case MENU_RADIUS:
 									box(next, 400, 70, 200);
 									print(next, 50, HEIGHT/2 - 30, "Loading neighborhood to cache...");
 									for (i = 0; i <= 2*radius; i++)
@@ -958,7 +1038,7 @@ void menu()
 									}
 									break;
 								/* disk cache */
-								case 6:
+								case MENU_CACHE:
 									if (config.cache_size != cache_size)
 									{
 										int old;
@@ -984,10 +1064,12 @@ void menu()
 									}
 									break;
 								/* exit menu */
-								case 7:
+								case MENU_VIEW:
+								/* view */
+								case MENU_EXIT:
 									return;
 								/* quit PSP-Maps */
-								case 8:
+								case MENU_QUIT:
 									quit();
 							}
 							update();
@@ -997,23 +1079,32 @@ void menu()
 						case PSP_BUTTON_L:
 							switch (active)
 							{
+								/* view */
+								case MENU_VIEW:
+									s--;
+									if (s < 0) s = NUM_VIEWS-1;
+									break;
 								/* favorites */
-								case 1:
-								case 2:
+								case MENU_LOAD:
+								case MENU_SAVE:
 									fav--;
 									if (fav < 0) fav = NUM_FAVORITES-1;
 									break;
+								/* infos */
+								case MENU_INFO:
+									config.show_info = !config.show_info;
+									break;
 								/* effects */
-								case 4:
+								case MENU_EFFECT:
 									config.use_effects = !config.use_effects;
 									break;
 								/* radius */
-								case 5:
+								case MENU_RADIUS:
 									radius--;
 									if (radius < 1) radius = MAX_RADIUS;
 									break;
 								/* disk cache */
-								case 6:
+								case MENU_CACHE:
 									cache_size /= 2;
 									if (cache_size == 0) cache_size = 409600;
 									if (cache_size < 100) cache_size = 0;
@@ -1026,23 +1117,32 @@ void menu()
 						case PSP_BUTTON_R:
 							switch (active)
 							{
+								/* view */
+								case MENU_VIEW:
+									s++;
+									if (s > NUM_VIEWS-1) s = 0;
+									break;
 								/* favorites */
-								case 1:
-								case 2:
+								case MENU_LOAD:
+								case MENU_SAVE:
 									fav++;
 									if (fav > NUM_FAVORITES-1) fav = 0;
 									break;
+								/* infos */
+								case MENU_INFO:
+									config.show_info = !config.show_info;
+									break;
 								/* effects */
-								case 4:
+								case MENU_EFFECT:
 									config.use_effects = !config.use_effects;
 									break;
 								/* radius */
-								case 5:
+								case MENU_RADIUS:
 									radius++;
 									if (radius > MAX_RADIUS) radius = 1;
 									break;
 								/* disk cache */
-								case 6:
+								case MENU_CACHE:
 									cache_size *= 2;
 									if (cache_size == 0) cache_size = 100;
 									if (cache_size > 409600) cache_size = 0;
@@ -1053,13 +1153,13 @@ void menu()
 						case SDLK_UP:
 						case PSP_BUTTON_UP:
 							active--;
-							if (active < 0) active = MENU_OPTIONS-1;
+							if (active < 0) active = MENU_NUM-1;
 							update();
 							break;
 						case SDLK_DOWN:
 						case PSP_BUTTON_DOWN:
 							active++;
-							if (active > MENU_OPTIONS-1) active = 0;
+							if (active > MENU_NUM-1) active = 0;
 							update();
 							break;
 						default:
@@ -1084,7 +1184,7 @@ void init()
 	/* default options */
 	config.cache_size = 1600;
 	config.use_effects = 1;
-	config.show_zoom = 0;
+	config.show_info = 0;
 	
 	/* load configuration if available */
 	if ((f = fopen("config.dat", "rb")) != NULL)
@@ -1148,7 +1248,7 @@ void init()
 	logo = IMG_Load("logo.png");
 	na = IMG_Load("na.png");
 	zoom = IMG_Load("zoom.png");
-	font = TTF_OpenFont("font.ttf", 12);
+	font = TTF_OpenFont("font.ttf", 11);
 	
 	/* display initial map */
 	display(FX_FADE);
@@ -1218,26 +1318,26 @@ void loop()
 								display(FX_OUT);
 							}
 							break;
-						case SDLK_LCTRL:
+						case SDLK_F1:
 						case PSP_BUTTON_Y:
 							go();
 							display(FX_FADE);
 							break;
-						case SDLK_LALT:
+						case SDLK_F2:
 						case PSP_BUTTON_X:
 							s--;
 							if (s < 0) s = NUM_VIEWS-1;
 							display(FX_FADE);
 							break;
-						case SDLK_SPACE:
+						case SDLK_F3:
 						case PSP_BUTTON_A:
 							s++;
 							if (s > NUM_VIEWS-1) s = 0;
 							display(FX_FADE);
 							break;
-						case SDLK_RCTRL:
+						case SDLK_F4:
 						case PSP_BUTTON_B:
-							config.show_zoom = !config.show_zoom;
+							config.show_info = !config.show_info;
 							display(FX_NONE);
 							break;
 						case SDLK_ESCAPE:
@@ -1252,17 +1352,23 @@ void loop()
 			}
 		}
 		
-		dx = SDL_JoystickGetAxis(joystick, 0) / (32768/16) / 16.0 * JOYSTICK_STEP;
+		dx = SDL_JoystickGetAxis(joystick, 0);
+		if (abs(dx) < JOYSTICK_DEAD) dx = 0; else dx -= abs(dx)/dx * JOYSTICK_DEAD;
+		dx *= JOYSTICK_STEP / (32768 - JOYSTICK_DEAD);
 		x += dx;
-		dy = SDL_JoystickGetAxis(joystick, 1) / (32768/16) / 16.0 * JOYSTICK_STEP;
+		
+		dy = SDL_JoystickGetAxis(joystick, 1);
+		if (abs(dy) < JOYSTICK_DEAD) dy = 0; else dy -= abs(dy)/dy * JOYSTICK_DEAD;
+		dy *= JOYSTICK_STEP / (32768 - JOYSTICK_DEAD);
 		y += dy;
+		
 		if (dx || dy) display(FX_NONE);
 		
 		SDL_Delay(50);
 	}
 }
 
-int main(void)
+int main(int argc, char *argv[])
 {
 	#ifdef _PSP_FW_VERSION
 	pspDebugScreenInit();

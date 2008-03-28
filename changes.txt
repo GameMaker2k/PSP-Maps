@@ -1,5 +1,18 @@
 Change log file for PSP-Maps
 
+version 0.7	(2008-03-29)
+	* added Windows version to the release
+	* added Google Maps and Yahoo Maps! hybrid views
+	* added Virtual Earth hill view
+	* added a list of available views in the menu
+	* new icon and screenshot
+	* joystick should be less sensitive and more precise
+	* added optional on-screen informations (lat/lon/zoom/view)
+	* geocoding now uses maps.google.com (and not .fr)
+	* load balancing between Google Maps servers
+	* menu updated (smaller font, nicer coding)
+	* readme file was updated
+
 version 0.6	(2008-03-20)
 	* added splash screen for the NEO Spring coding contest 2008
 	* added a progress bar when shrinking the cache
