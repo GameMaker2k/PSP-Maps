@@ -33,7 +33,7 @@
 #include <SDL_ttf.h>
 #include <curl/curl.h>
 
-#define VERSION "0.7"
+#define VERSION "0.8"
 #define WIDTH 480
 #define HEIGHT 272
 #define BPP 32
@@ -65,6 +65,9 @@ PSP_MAIN_THREAD_ATTR(THREAD_ATTR_USER);
 PSP_HEAP_SIZE_KB(20480);
 void quit();
 #include "netdialog.c"
+#define DANZEFF_SDL
+#include "pspctrl_emu.c"
+#include "danzeff.c"
 #endif
 
 #ifdef _WIN32
@@ -82,12 +85,13 @@ char response[BUFFER_SIZE];
 /* x, y, z are in Google's format: z = [ -4 .. 16 ], x and y = [ 1 .. 2^(17-z) ] */
 int z = 16, s = 0;
 float x = 1, y = 1, dx, dy;
-int active = 0, fav = 0, balancing = 0;
+int active = 0, fav = 0, balancing = 0, radius = 5;
 
 /* cache in memory, for recent history and smooth moves */
 struct
 {
-	int x, y, z, s;
+	int x, y;
+	char z, s;
 	SDL_Surface *tile;
 } memory[MEMORY_CACHE_SIZE];
 int memory_idx = 0;
@@ -95,7 +99,8 @@ int memory_idx = 0;
 /* cache on disk, for offline browsing and to limit requests */
 struct _disk
 {
-	int x, y, z, s;
+	int x, y;
+	char z, s;
 } *disk;
 int disk_idx = 0;
 
@@ -110,13 +115,14 @@ struct
 	int cache_size;
 	int use_effects;
 	int show_info;
+	int danzeff;
 } config;
 
 /* user's favorite places */
 struct
 {
 	float x, y;
-	int z, s, ok;
+	char z, s, ok;
 	char name[50];
 } favorite[NUM_FAVORITES];
 
@@ -194,6 +200,7 @@ enum
 	MENU_DEFAULT,
 	MENU_INFO,
 	MENU_EFFECT,
+	MENU_KEYBOARD,
 	MENU_RADIUS,
 	MENU_CACHE,
 	MENU_EXIT,
@@ -207,7 +214,7 @@ void quit()
 	FILE *f;
 	
 	/* save disk cache */
-	if ((f = fopen("disk.dat", "wb")) != NULL)
+	if ((f = fopen("data/disk.dat", "wb")) != NULL)
 	{
 		fwrite(&disk_idx, sizeof(disk_idx), 1, f);
 		fwrite(disk, sizeof(struct _disk), config.cache_size, f);
@@ -215,14 +222,14 @@ void quit()
 	}
 	
 	/* save configuration */
-	if ((f = fopen("config.dat", "wb")) != NULL)
+	if ((f = fopen("data/config.dat", "wb")) != NULL)
 	{
 		fwrite(&config, sizeof(config), 1, f);
 		fclose(f);
 	}
 	
 	/* save favorites */
-	if ((f = fopen("favorite.dat", "wb")) != NULL)
+	if ((f = fopen("data/favorite.dat", "wb")) != NULL)
 	{
 		fwrite(favorite, sizeof(favorite), 1, f);
 		fclose(f);
@@ -311,6 +318,17 @@ void savememory(int x, int y, int z, int s, SDL_Surface *tile)
 	memory_idx = (memory_idx + 1) % MEMORY_CACHE_SIZE;
 }
 
+/* return the disk file name for cache entry
+ * maximum of 1000 entries per folder to improve access speed */
+void diskname(char *buf, int n)
+{
+	/* create folders if needed */
+	sprintf(buf, "cache/%.3d", n/1000);
+	mkdir(buf, 0755);
+	/* return the full file name */
+	sprintf(buf, "cache/%.3d/%.3d.dat", n/1000, n%1000);
+}
+
 /* save tile in disk cache */
 void savedisk(int x, int y, int z, int s, SDL_RWops *rw, int n)
 {
@@ -334,7 +352,7 @@ void savedisk(int x, int y, int z, int s, SDL_RWops *rw, int n)
 	disk[disk_idx].s = s;
 	
 	SDL_RWseek(rw, 0, SEEK_SET);
-	sprintf(name, "cache/%d.dat", disk_idx);
+	diskname(name, disk_idx);
 	if ((f = fopen(name, "wb")) != NULL)
 	{
 		SDL_RWread(rw, buffer, 1, n);
@@ -429,7 +447,7 @@ SDL_Surface *getdisk(int x, int y, int z, int s)
 	for (i = 0; i < config.cache_size; i++)
 		if (disk[i].x == x && disk[i].y == y && disk[i].z == z && disk[i].s == s)
 		{
-			sprintf(name, "cache/%d.dat", i);
+			diskname(name, i);
 			return IMG_Load(name);
 		}
 	return NULL;
@@ -541,110 +559,171 @@ void input(SDL_Surface *dst, int x, int y, char *text, int max)
 		SDL_Flip(screen);
 	}
 	
-	strcpy(text, " ");
-	for (;;)
+	#ifdef _PSP_FW_VERSION
+	/* danzeff */
+	if (config.danzeff)
 	{
-		while (SDL_PollEvent(&event))
+		strcpy(text, "");
+		danzeff_load();
+		danzeff_set_screen(dst);
+		danzeff_moveTo(165, 110);
+		
+		for (;;)
 		{
-			switch (event.type)
+			SceCtrlData ctrl = getCtrlFromJoystick(joystick);
+			int c = danzeff_readInput(ctrl);
+			
+			switch (c)
 			{
-				case SDL_QUIT:
-					quit();
+				case 0:
 					break;
-				case SDL_KEYDOWN:
-				case SDL_JOYBUTTONDOWN:
-					if (event.type == SDL_KEYDOWN)
-						action = event.key.keysym.sym;
-					else
-						action = event.jbutton.button;
-					switch (action)
+				case '\10':
+				case DANZEFF_LEFT:
+					if (active > 0)
 					{
-						case SDLK_ESCAPE:
-						case SDLK_RETURN:
-						case SDLK_SPACE:
-						case PSP_BUTTON_START:
-							return;
-						case SDLK_LEFT:
-						case PSP_BUTTON_LEFT:
-						case PSP_BUTTON_L:
-						case PSP_BUTTON_B:
-							if (active > 0)
-							{
-								text[active] = '\0';
-								active--;
-							}
-							break;
-						case SDLK_RIGHT:
-						case PSP_BUTTON_RIGHT:
-						case PSP_BUTTON_R:
-						case PSP_BUTTON_A:
-						case PSP_BUTTON_X:
-						case PSP_BUTTON_Y:
-							if (active < max)
-							{
-								active++;
-								text[active] = ' ';
-								text[active+1] = '\0';
-							}
-							break;
-						case SDLK_UP:
-						case PSP_BUTTON_UP:
-							up = 1;
-							break;
-						case SDLK_DOWN:
-						case PSP_BUTTON_DOWN:
-							down = 1;
-							break;
-						default:
-							break;
+						active--;
+						text[active] = '\0';
 					}
 					break;
-				case SDL_KEYUP:
-				case SDL_JOYBUTTONUP:
-					if (event.type == SDL_KEYUP)
-						action = event.key.keysym.sym;
-					else
-						action = event.jbutton.button;
-					switch (action)
+				case DANZEFF_RIGHT:
+					if (active < max)
 					{
-						case SDLK_UP:
-						case PSP_BUTTON_UP:
-							up = 0;
-							break;
-						case SDLK_DOWN:
-						case PSP_BUTTON_DOWN:
-							down = 0;
-							break;
+						text[active] = ' ';
+						active++;
+						text[active] = '\0';
+					}
+					break;
+				case DANZEFF_SELECT:
+				case DANZEFF_START:
+					return;
+				default:
+					if (active < max)
+					{
+						text[active] = c;
+						active++;
+						text[active] = '\0';
 					}
 					break;
 			}
+			
+			danzeff_render();
+			update();
+			SDL_Delay(50);
+			
+			/* flush events */
+			while (SDL_PollEvent(&event));
 		}
-		if (up == 1 || up > 10)
+	}
+	else	
+	#endif
+	
+	/* arcade */
+	{
+		strcpy(text, " ");
+		for (;;)
 		{
-			if ((text[active] >= 'A' && text[active] < 'Z') || (text[active] >= '0' && text[active] < '9')) text[active]++;
-			else if (text[active] == 'Z') text[active] = '0';
-			else if (text[active] == '9') text[active] = ' ';
-			else if (text[active] == ' ') text[active] = 'A';
+			while (SDL_PollEvent(&event))
+			{
+				switch (event.type)
+				{
+					case SDL_QUIT:
+						quit();
+						break;
+					case SDL_KEYDOWN:
+					case SDL_JOYBUTTONDOWN:
+						if (event.type == SDL_KEYDOWN)
+							action = event.key.keysym.sym;
+						else
+							action = event.jbutton.button;
+						switch (action)
+						{
+							case SDLK_ESCAPE:
+							case SDLK_RETURN:
+							case SDLK_SPACE:
+							case PSP_BUTTON_START:
+								return;
+							case SDLK_LEFT:
+							case PSP_BUTTON_LEFT:
+							case PSP_BUTTON_L:
+							case PSP_BUTTON_B:
+								if (active > 0)
+								{
+									text[active] = '\0';
+									active--;
+								}
+								break;
+							case SDLK_RIGHT:
+							case PSP_BUTTON_RIGHT:
+							case PSP_BUTTON_R:
+							case PSP_BUTTON_A:
+							case PSP_BUTTON_X:
+							case PSP_BUTTON_Y:
+								if (active < max)
+								{
+									active++;
+									text[active] = ' ';
+									text[active+1] = '\0';
+								}
+								break;
+							case SDLK_UP:
+							case PSP_BUTTON_UP:
+								up = 1;
+								break;
+							case SDLK_DOWN:
+							case PSP_BUTTON_DOWN:
+								down = 1;
+								break;
+							default:
+								break;
+						}
+						break;
+					case SDL_KEYUP:
+					case SDL_JOYBUTTONUP:
+						if (event.type == SDL_KEYUP)
+							action = event.key.keysym.sym;
+						else
+							action = event.jbutton.button;
+						switch (action)
+						{
+							case SDLK_UP:
+							case PSP_BUTTON_UP:
+								up = 0;
+								break;
+							case SDLK_DOWN:
+							case PSP_BUTTON_DOWN:
+								down = 0;
+								break;
+						}
+						break;
+				}
+			}
+			if (up == 1 || up > 10)
+			{
+				if ((text[active] >= 'A' && text[active] < 'Z') || (text[active] >= '0' && text[active] < '9')) text[active]++;
+				else if (text[active] == 'Z') text[active] = '0';
+				else if (text[active] == '9') text[active] = ' ';
+				else if (text[active] == ' ') text[active] = 'A';
+			}
+			if (up) up++;
+			if (down == 1 || down > 10)
+			{
+				if ((text[active] > 'A' && text[active] <= 'Z') || (text[active] > '0' && text[active] <= '9')) text[active]--;
+				else if (text[active] == 'A') text[active] = ' ';
+				else if (text[active] == ' ') text[active] = '9';
+				else if (text[active] == '0') text[active] = 'Z';
+			}
+			if (down) down++;
+			update();
+			SDL_Delay(50);
 		}
-		if (up) up++;
-		if (down == 1 || down > 10)
-		{
-			if ((text[active] > 'A' && text[active] <= 'Z') || (text[active] > '0' && text[active] <= '9')) text[active]--;
-			else if (text[active] == 'A') text[active] = ' ';
-			else if (text[active] == ' ') text[active] = '9';
-			else if (text[active] == '0') text[active] = 'Z';
-		}
-		if (down) down++;
-		update();
-		SDL_Delay(50);
 	}
 }
 
-/* displays a box at the center of the screen */
-void box(SDL_Surface *dst, int w, int h, int sh)
+/* displays a box centered at a specific position */
+void box(SDL_Surface *dst, int x, int y, int w, int h, int sh)
 {
-	rectangleRGBA(dst, WIDTH/2 - w/2 - 1, HEIGHT/2 - h/2 - 1, WIDTH/2 + w/2 + 1, HEIGHT/2 + h/2 + 1, 255, 255, 255, 255);
- 	boxRGBA(dst, WIDTH/2 - w/2, HEIGHT/2 - h/2, WIDTH/2 + w/2, HEIGHT/2 + h/2, 0, 0, 0, sh);
+	rectangleRGBA(dst, x - w/2 - 1, y - h/2 - 1, x + w/2 + 1, y + h/2 + 1, 255, 255, 255, 255);
+ 	boxRGBA(dst, x - w/2, y - h/2, x + w/2, y + h/2, 0, 0, 0, sh);
 }
 
 /* fx for transition between prev and next screen */
@@ -816,7 +895,7 @@ void display(int fx)
 	{
 		int x, y;
 		SDL_BlitSurface(prev, NULL, screen, NULL);
-		box(screen, 200, 70, 200);
+		box(screen, WIDTH/2, HEIGHT/2, 200, 70, 200);
 		TTF_SizeText(font, "LOADING...", &x, &y);
 		print(screen, WIDTH/2 - x/2, HEIGHT/2 - 10 - y/2, "LOADING...");
 		TTF_SizeText(font, _view[s], &x, &y);
@@ -882,9 +961,9 @@ void go()
 		1,	// exact
 	};
 	
-	box(next, 400, 80, 200);
-	print(next, 50, HEIGHT/2 - 30, "Enter address, up/down to change letters, start to validate: ");
-	input(next, 50, HEIGHT/2, address, 46);
+	box(next, WIDTH/2, HEIGHT/2 - 60, 400, 80, 200);
+	print(next, 50, HEIGHT/2 - 90, "Enter address, up/down to change letters, start to validate: ");
+	input(next, 50, HEIGHT/2 - 60, address, 46);
 	
 	DEBUG("go(%s)\n", address);
 	
@@ -921,7 +1000,7 @@ void go()
 void menu()
 {
 	SDL_Event event;
-	int action, cache_size = config.cache_size, radius = 5;
+	int action, cache_size = config.cache_size;
 	int i, j;
 	
 	#define MENU_LEFT 140
@@ -948,6 +1027,7 @@ void menu()
 		ENTRY(MENU_DEFAULT, "Default view");
 		ENTRY(MENU_INFO, "Show informations: %s", config.show_info ? "Yes" : "No");
 		ENTRY(MENU_EFFECT, "Transition effects: %s", config.use_effects ? "Yes" : "No");
+		ENTRY(MENU_KEYBOARD, "Keyboard type: %s", config.danzeff ? "Danzeff" : "Arcade");
 		ENTRY(MENU_RADIUS, "Cache neighborhood radius: %d", radius);
 		ENTRY(MENU_CACHE, "Cache size: %d (~ %d MB)", cache_size, cache_size * 20 / 1000);
 		ENTRY(MENU_EXIT, "Exit menu");
@@ -1023,15 +1103,29 @@ void menu()
 								case MENU_EFFECT:
 									config.use_effects = !config.use_effects;
 									break;
+								/* keyboard */
+								case MENU_KEYBOARD:
+									config.danzeff = !config.danzeff;
+									break;
 								/* radius */
 								case MENU_RADIUS:
-									box(next, 400, 70, 200);
+									box(next, WIDTH/2, HEIGHT/2, 400, 70, 200);
 									print(next, 50, HEIGHT/2 - 30, "Loading neighborhood to cache...");
 									for (i = 0; i <= 2*radius; i++)
 									for (j = 0; j <= 2*radius; j++)
 									{
 										float ratio = 1.0 * (i*(2*radius+1)+j+1)/(2*radius+1)/(2*radius+1);
 										boxRGBA(next, WIDTH/2 - 180, HEIGHT/2, WIDTH/2 - 180 + 360.0 * ratio, HEIGHT/2 + 15, 255, 0, 0, 255);
+										/* special process for hybrid maps: get 2 images */
+										switch (s)
+										{
+											case GG_HYBRID:
+												gettile(x-radius+i, y-radius+j, z, GG_SATELLITE);
+												break;
+											case YH_HYBRID:
+												gettile(x-radius+i, y-radius+j, z, YH_SATELLITE);
+												break;
+										}
 										gettile(x-radius+i, y-radius+j, z, s);
 										SDL_BlitSurface(next, NULL, screen, NULL);
 										SDL_Flip(screen);
@@ -1045,14 +1139,14 @@ void menu()
 										old = config.cache_size;
 										config.cache_size = cache_size;
 										/* remove data on disk if needed */
-										box(next, 400, 70, 200);
+										box(next, WIDTH/2, HEIGHT/2, 400, 70, 200);
 										print(next, 50, HEIGHT/2 - 30, "Cleaning cache...");
 										for (i = config.cache_size; i < disk_idx; i++)
 										{
 											char name[50];
 											float ratio = 1.0 * (i - config.cache_size) / (disk_idx - config.cache_size);
 											boxRGBA(next, WIDTH/2 - 180, HEIGHT/2, WIDTH/2 - 180 + 360.0 * ratio, HEIGHT/2 + 15, 255, 0, 0, 255);
-											sprintf(name, "cache/%d.dat", i);
+											diskname(name, i);
 											unlink(name);
 											SDL_BlitSurface(next, NULL, screen, NULL);
 											SDL_Flip(screen);
@@ -1098,6 +1192,10 @@ void menu()
 								case MENU_EFFECT:
 									config.use_effects = !config.use_effects;
 									break;
+								/* keyboard */
+								case MENU_KEYBOARD:
+									config.danzeff = !config.danzeff;
+									break;
 								/* radius */
 								case MENU_RADIUS:
 									radius--;
@@ -1135,6 +1233,10 @@ void menu()
 								/* effects */
 								case MENU_EFFECT:
 									config.use_effects = !config.use_effects;
+									break;
+								/* keyboard */
+								case MENU_KEYBOARD:
+									config.danzeff = !config.danzeff;
 									break;
 								/* radius */
 								case MENU_RADIUS:
@@ -1185,9 +1287,10 @@ void init()
 	config.cache_size = 1600;
 	config.use_effects = 1;
 	config.show_info = 0;
+	config.danzeff = 1;
 	
 	/* load configuration if available */
-	if ((f = fopen("config.dat", "rb")) != NULL)
+	if ((f = fopen("data/config.dat", "rb")) != NULL)
 	{
 		fread(&config, sizeof(config), 1, f);
 		fclose(f);
@@ -1198,7 +1301,7 @@ void init()
 	
 	/* load disk cache if available */
 	bzero(disk, sizeof(struct _disk) * config.cache_size);
-	if ((f = fopen("disk.dat", "rb")) != NULL)
+	if ((f = fopen("data/disk.dat", "rb")) != NULL)
 	{
 		fread(&disk_idx, sizeof(disk_idx), 1, f);
 		fread(disk, sizeof(struct _disk), config.cache_size, f);
@@ -1210,7 +1313,7 @@ void init()
 	
 	/* load favorites if available */
 	bzero(favorite, sizeof(favorite));
-	if ((f = fopen("favorite.dat", "rb")) != NULL)
+	if ((f = fopen("data/favorite.dat", "rb")) != NULL)
 	{
 		fread(favorite, sizeof(favorite), 1, f);
 		fclose(f);
@@ -1237,7 +1340,7 @@ void init()
 		quit();
 	
 	/* splash screen */
-	logo = IMG_Load("contest.png");
+	logo = IMG_Load("data/contest.png");
 	SDL_BlitSurface(logo, NULL, next, NULL);
 	SDL_FreeSurface(logo);
 	SDL_BlitSurface(next, NULL, screen, NULL);
@@ -1245,10 +1348,10 @@ void init()
 	SDL_Delay(1500);
 	
 	/* load textures */
-	logo = IMG_Load("logo.png");
-	na = IMG_Load("na.png");
-	zoom = IMG_Load("zoom.png");
-	font = TTF_OpenFont("font.ttf", 11);
+	logo = IMG_Load("data/logo.png");
+	na = IMG_Load("data/na.png");
+	zoom = IMG_Load("data/zoom.png");
+	font = TTF_OpenFont("data/font.ttf", 11);
 	
 	/* display initial map */
 	display(FX_FADE);

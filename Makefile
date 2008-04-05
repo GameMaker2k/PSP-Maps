@@ -24,6 +24,6 @@ CFLAGS += -I/usr/local/pspdev/psp/include/SDL $(shell $(PSPBIN)/curl-config --cf
 LIBS = -lc -lSDL_image -lSDL_gfx -lSDL_ttf -lpng -ljpeg -lSDL -lcurl -lfreetype
 LIBS += $(shell $(PSPBIN)/sdl-config --libs)
 LIBS += $(shell $(PSPBIN)/curl-config --libs)
-LIBS +=  -lpspwlan -lpsputility -lpspgum -lpspgu -lm
+LIBS += -lpspwlan -lpsputility -lpspgum -lpspgu -lm
 
 include $(PSPSDK)/lib/build.mak

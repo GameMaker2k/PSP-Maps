@@ -32,4 +32,4 @@ PC version:
 	* It can also be used to prepare a large cache (PC is faster than PSP).
 	* You will have exactly the same display as the PSP.
 	* Arrows to move, page up/down to zoom, F1/F2/F3/F4 for buttons, escape for menu.
-	* Copy the disk.dat and cache/ folders to your PSP.
+	* Copy the data/ folder to your PSP.

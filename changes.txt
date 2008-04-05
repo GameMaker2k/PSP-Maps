@@ -1,5 +1,12 @@
 Change log file for PSP-Maps
 
+version 0.8	(2008-04-06)
+	* better performance with big cache
+	* added Danzeff keyboard support
+	* fixed cache neighborhood option for hybrid maps
+	* moved images, font and user files to the data/ subfolder
+	* improved memory usage
+
 version 0.7	(2008-03-29)
 	* added Windows version to the release
 	* added Google Maps and Yahoo Maps! hybrid views
