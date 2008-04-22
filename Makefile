@@ -1,29 +1,13 @@
-TARGET = PSP-Maps
-OBJS = pspmaps.o
+CFLAGS = -Wall -O2 -g
+SDLCONFIG = sdl-config
+CURLCONFIG = curl-config
+LIBS = -lSDL_image -lSDL_gfx -lSDL_ttf -lSDL_mixer
 
-PSP_FW_VERSION = 371
-BUILD_PRX = 1
+pspmaps: pspmaps.c $(ICON)
+	$(CC) $(CFLAGS) -o pspmaps$(EXT) pspmaps.c $(ICON) $(LIBS) `$(CURLCONFIG) --cflags --libs` `$(SDLCONFIG) --cflags --libs`
 
-INCDIR = 
-CFLAGS = -O2 -G0 -Wall -g
-CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
-ASFLAGS = $(CFLAGS)
+icon.o: icon.rc
+	$(WINDRES) -i icon.rc -o icon.o
 
-LIBDIR =
-
-EXTRA_TARGETS = EBOOT.PBP
-PSP_EBOOT_TITLE = PSP-Maps
-PSP_EBOOT_ICON = icon.png
-PSP_EBOOT_PIC1 = screenshot.png
-
-PSPSDK=$(shell psp-config --pspsdk-path)
-PSPBIN = $(PSPSDK)/../bin
-
-CFLAGS += -I/usr/local/pspdev/psp/include/SDL $(shell $(PSPBIN)/curl-config --cflags)
-
-LIBS = -lc -lSDL_image -lSDL_gfx -lSDL_ttf -lpng -ljpeg -lSDL -lcurl -lfreetype
-LIBS += $(shell $(PSPBIN)/sdl-config --libs)
-LIBS += $(shell $(PSPBIN)/curl-config --libs)
-LIBS += -lpspwlan -lpsputility -lpspgum -lpspgu -lm
-
-include $(PSPSDK)/lib/build.mak
+clean:
+	rm -f pspmaps pspmaps.exe pspmaps.o icon.o PSP-Maps.prx PSP-Maps.elf PARAM.SFO EBOOT.PBP pspmaps.gpu

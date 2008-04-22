@@ -31,13 +31,21 @@
 #include <SDL_rotozoom.h>
 #include <SDL_gfxPrimitives.h>
 #include <SDL_ttf.h>
+#include <SDL_mixer.h>
 #include <curl/curl.h>
 
-#define VERSION "0.8"
+#define VERSION "1.0"
+
+#ifdef GP2X
+#define WIDTH 320
+#define HEIGHT 240
+#else
 #define WIDTH 480
 #define HEIGHT 272
+#endif
+
 #define BPP 32
-#define BUFFER_SIZE 100 * 1024
+#define BUFFER_SIZE 200 * 1024
 #define MEMORY_CACHE_SIZE 32
 #define DIGITAL_STEP 0.5
 #define JOYSTICK_STEP 0.05
@@ -47,7 +55,7 @@
 #define BLACK SDL_MapRGB(screen->format, 0, 0, 0)
 #define WHITE SDL_MapRGB(screen->format, 255, 255, 255)
 
-#ifdef _PSP_FW_VERSION
+#if _PSP_FW_VERSION || GP2X
 #define DEBUG(x...) {}
 #else
 #define DEBUG(x...) printf(x);
@@ -86,6 +94,9 @@ char response[BUFFER_SIZE];
 int z = 16, s = 0;
 float x = 1, y = 1, dx, dy;
 int active = 0, fav = 0, balancing = 0, radius = 5;
+
+/* cheat mode */
+int cheat = 0;
 
 /* cache in memory, for recent history and smooth moves */
 struct
@@ -140,11 +151,22 @@ enum
 	YH_MAP,
 	YH_SATELLITE,
 	YH_HYBRID,
-	NUM_VIEWS
+	NORMAL_VIEWS,
+	GG_MOON_APOLLO,
+	GG_MOON_VISIBLE,
+	GG_MOON_ELEVATION,
+	GG_MARS_ELEVATION,
+	GG_MARS_VISIBLE,
+	GG_MARS_INFRARED,
+	GG_SKY_VISIBLE,
+	GG_SKY_INFRARED,
+	GG_SKY_MICROWAVE,
+	GG_SKY_HISTORICAL,
+	CHEAT_VIEWS
 };
 
 /* legend for view types */
-char *_view[NUM_VIEWS] = {
+char *_view[CHEAT_VIEWS] = {
 	"Google Maps / Map",
 	"Google Maps / Satellite",
 	"Google Maps / Hybrid",
@@ -155,16 +177,45 @@ char *_view[NUM_VIEWS] = {
 	"Virtual Earth / Hill",
 	"Yahoo! Maps / Map",
 	"Yahoo! Maps / Satellite",
-	"Yahoo! Maps / Hybrid"
+	"Yahoo! Maps / Hybrid",
+	"",
+	"Google Moon / Apollo",
+	"Google Moon / Visible",
+	"Google Moon / Elevation",
+	"Google Mars / Elevation",
+	"Google Mars / Visible",
+	"Google Mars / Infrared",
+	"Google Sky / Visible",
+	"Google Sky / Infrared",
+	"Google Sky / Microwave",
+	"Google Sky / Historical",
 };
 
 /* PSP buttons list */
+#ifdef GP2X
 enum
 {
-	PSP_BUTTON_Y,
-	PSP_BUTTON_B,
-	PSP_BUTTON_A,
+	PSP_BUTTON_UP = 0,
+	PSP_BUTTON_LEFT = 2,
+	PSP_BUTTON_DOWN = 4,
+	PSP_BUTTON_RIGHT = 6,
+	PSP_BUTTON_START = 8,
+	PSP_BUTTON_SELECT = 9,
+	PSP_BUTTON_L = 10,
+	PSP_BUTTON_R = 11,
+	PSP_BUTTON_Y = 12,
+	PSP_BUTTON_A = 13,
+	PSP_BUTTON_B = 14,
+	PSP_BUTTON_X = 15,
+	PSP_NUM_BUTTONS
+};
+#else
+enum
+{
 	PSP_BUTTON_X,
+	PSP_BUTTON_A,
+	PSP_BUTTON_B,
+	PSP_BUTTON_Y,
 	PSP_BUTTON_L,
 	PSP_BUTTON_R,
 	PSP_BUTTON_DOWN,
@@ -175,6 +226,7 @@ enum
 	PSP_BUTTON_START,
 	PSP_NUM_BUTTONS
 };
+#endif
 
 /* transition effects */
 enum
@@ -392,7 +444,7 @@ SDL_RWops *getnet(int x, int y, int z, int s)
 			sprintf(request, "http://mt%d.google.com/mt?n=404&v=w2t.69&x=%d&y=%d&zoom=%d", ++balancing%4, x, y, z);
 			break;
 		case GG_TERRAIN:
-			sprintf(request, "http://mt%d.google.com/mt?n=404&v=w2p.64&x=%d&y=%d&zoom=%d", ++balancing%4, x, y, z);
+			sprintf(request, "http://mt%d.google.com/mt?n=404&v=w2p.71&x=%d&y=%d&zoom=%d", ++balancing%4, x, y, z);
 			break;
 		case VE_ROAD:
 			sprintf(request, "http://tiles.virtualearth.net/tiles/r");
@@ -422,6 +474,42 @@ SDL_RWops *getnet(int x, int y, int z, int s)
 			break;
 		case YH_HYBRID:
 			sprintf(request, "http://us.maps3.yimg.com/aerial.maps.yimg.com/ximg?v=2.5&t=p&x=%d&y=%d&z=%d", x, (int) pow(2, 16-z)-y-1, z+1);
+			break;
+		case GG_MOON_APOLLO:
+			sprintf(request, "http://mw1.google.com/mw-planetary/lunar/lunarmaps_v1/apollo/%d/%d/%d.jpg", 17-z, x, (int) pow(2, 17-z)-y-1);
+			break;
+		case GG_MOON_VISIBLE:
+			sprintf(request, "http://mw1.google.com/mw-planetary/lunar/lunarmaps_v1/clem_bw/%d/%d/%d.jpg", 17-z, x, (int) pow(2, 17-z)-y-1);
+			break;
+		case GG_MOON_ELEVATION:
+			sprintf(request, "http://mw1.google.com/mw-planetary/lunar/lunarmaps_v1/terrain/%d/%d/%d.jpg", 17-z, x, (int) pow(2, 17-z)-y-1);
+			break;
+		case GG_MARS_ELEVATION:
+			sprintf(request, "http://mw1.google.com/mw-planetary/mars/elevation/");
+			GGtile(x, y, z, request + strlen(request));
+			strcat(request, ".jpg");
+			break;
+		case GG_MARS_VISIBLE:
+			sprintf(request, "http://mw1.google.com/mw-planetary/mars/visible/");
+			GGtile(x, y, z, request + strlen(request));
+			strcat(request, ".jpg");
+			break;
+		case GG_MARS_INFRARED:
+			sprintf(request, "http://mw1.google.com/mw-planetary/mars/infrared/");
+			GGtile(x, y, z, request + strlen(request));
+			strcat(request, ".jpg");
+			break;
+		case GG_SKY_VISIBLE:
+			sprintf(request, "http://mw1.google.com/mw-planetary/sky/skytiles_v1/%d_%d_%d.jpg", x, y, 17-z);
+			break;
+		case GG_SKY_INFRARED:
+			sprintf(request, "http://mw1.google.com/mw-planetary/sky/mapscontent_v1/overlayTiles/iras/zoom%d/iras_%d_%d.png", 17-z, x, y);
+			break;
+		case GG_SKY_MICROWAVE:
+			sprintf(request, "http://mw1.google.com/mw-planetary/sky/mapscontent_v1/overlayTiles/wmap/zoom%d/wmap_%d_%d.png", 17-z, x, y);
+			break;
+		case GG_SKY_HISTORICAL:
+			sprintf(request, "http://mw1.google.com/mw-planetary/sky/mapscontent_v1/overlayTiles/cassini/zoom%d/cassini_%d_%d.png", 17-z, x, y);
 			break;
 	}
 	
@@ -638,14 +726,13 @@ void input(SDL_Surface *dst, int x, int y, char *text, int max)
 						switch (action)
 						{
 							case SDLK_ESCAPE:
-							case SDLK_RETURN:
 							case SDLK_SPACE:
 							case PSP_BUTTON_START:
 								return;
 							case SDLK_LEFT:
 							case PSP_BUTTON_LEFT:
 							case PSP_BUTTON_L:
-							case PSP_BUTTON_B:
+							case PSP_BUTTON_A:
 								if (active > 0)
 								{
 									text[active] = '\0';
@@ -655,9 +742,9 @@ void input(SDL_Surface *dst, int x, int y, char *text, int max)
 							case SDLK_RIGHT:
 							case PSP_BUTTON_RIGHT:
 							case PSP_BUTTON_R:
-							case PSP_BUTTON_A:
-							case PSP_BUTTON_X:
+							case PSP_BUTTON_B:
 							case PSP_BUTTON_Y:
+							case PSP_BUTTON_X:
 								if (active < max)
 								{
 									active++;
@@ -750,7 +837,7 @@ void effect(int fx)
 				SDL_FreeSurface(tmp);
 				SDL_Flip(screen);
 				t += 0.1;
-				#ifndef _PSP_FW_VERSION
+				#if ! ( _PSP_FW_VERSION || GP2X )
 				SDL_Delay(20);
 				#endif
 			}
@@ -766,7 +853,7 @@ void effect(int fx)
 				SDL_FreeSurface(tmp);
 				SDL_Flip(screen);
 				t -= 0.1;
-				#ifndef _PSP_FW_VERSION
+				#if ! ( _PSP_FW_VERSION || GP2X )
 				SDL_Delay(20);
 				#endif
 			}
@@ -780,7 +867,7 @@ void effect(int fx)
 				SDL_BlitSurface(tmp, NULL, screen, NULL);
 				SDL_FreeSurface(tmp);
 				SDL_Flip(screen);
-				#ifndef _PSP_FW_VERSION
+				#if ! ( _PSP_FW_VERSION || GP2X )
 				SDL_Delay(20);
 				#endif
 			}
@@ -794,7 +881,7 @@ void effect(int fx)
 				r.x = DIGITAL_STEP * 256 - i;
 				SDL_BlitSurface(next, &r, screen, NULL);
 				SDL_Flip(screen);
-				#ifndef _PSP_FW_VERSION
+				#if ! ( _PSP_FW_VERSION || GP2X )
 				SDL_Delay(20);
 				#endif
 			}
@@ -808,7 +895,7 @@ void effect(int fx)
 				r.x = DIGITAL_STEP * 256 - i;
 				SDL_BlitSurface(next, NULL, screen, &r);
 				SDL_Flip(screen);
-				#ifndef _PSP_FW_VERSION
+				#if ! ( _PSP_FW_VERSION || GP2X )
 				SDL_Delay(20);
 				#endif
 			}
@@ -822,7 +909,7 @@ void effect(int fx)
 				r.y = DIGITAL_STEP * 256 - i;
 				SDL_BlitSurface(next, &r, screen, NULL);
 				SDL_Flip(screen);
-				#ifndef _PSP_FW_VERSION
+				#if ! ( _PSP_FW_VERSION || GP2X )
 				SDL_Delay(20);
 				#endif
 			}
@@ -836,7 +923,7 @@ void effect(int fx)
 				r.y = DIGITAL_STEP * 256 - i;
 				SDL_BlitSurface(next, NULL, screen, &r);
 				SDL_Flip(screen);
-				#ifndef _PSP_FW_VERSION
+				#if ! ( _PSP_FW_VERSION || GP2X )
 				SDL_Delay(20);
 				#endif
 			}
@@ -1003,7 +1090,12 @@ void menu()
 	int action, cache_size = config.cache_size;
 	int i, j;
 	
+	#ifdef GP2X
+	#define MENU_LEFT 80
+	#else
 	#define MENU_LEFT 140
+	#endif
+	
 	#define MENU_TOP 65
 	#define MENU_BOTTOM 30
 	#define MENU_Y (HEIGHT - MENU_TOP - MENU_BOTTOM) / MENU_NUM
@@ -1015,10 +1107,10 @@ void menu()
 		char temp[50];
 		SDL_Rect pos;
 		SDL_FillRect(next, NULL, BLACK);
-		pos.x = 80;
+		pos.x = MENU_LEFT-60;
 		pos.y = 0;
 		SDL_BlitSurface(logo, NULL, next, &pos);
-		print(next, 280, 30, "version " VERSION);
+		print(next, MENU_LEFT+140, 30, "version " VERSION);
 		print(next, MENU_LEFT-20, MENU_TOP + active * MENU_Y, ">");
 		ENTRY(MENU_VIEW, "Current view: %s", _view[s]);
 		ENTRY(MENU_ADDRESS, "Enter address...");
@@ -1032,7 +1124,7 @@ void menu()
 		ENTRY(MENU_CACHE, "Cache size: %d (~ %d MB)", cache_size, cache_size * 20 / 1000);
 		ENTRY(MENU_EXIT, "Exit menu");
 		ENTRY(MENU_QUIT, "Quit PSP-Maps");
-		print(next, 120, 250, "http://royale.zerezo.com/psp/");
+		print(next, MENU_LEFT-20, HEIGHT-20, "http://royale.zerezo.com/psp/");
 		SDL_BlitSurface(next, NULL, screen, NULL);
 		SDL_Flip(screen);
 	}
@@ -1058,12 +1150,11 @@ void menu()
 						case SDLK_ESCAPE:
 						case PSP_BUTTON_START:
 							return;
-						case SDLK_RETURN:
 						case SDLK_SPACE:
-						case PSP_BUTTON_A:
 						case PSP_BUTTON_B:
-						case PSP_BUTTON_X:
+						case PSP_BUTTON_A:
 						case PSP_BUTTON_Y:
+						case PSP_BUTTON_X:
 							switch (active)
 							{
 								/* enter address */
@@ -1176,7 +1267,7 @@ void menu()
 								/* view */
 								case MENU_VIEW:
 									s--;
-									if (s < 0) s = NUM_VIEWS-1;
+									if (s < (cheat?NORMAL_VIEWS+1:0)) s = (cheat?CHEAT_VIEWS:NORMAL_VIEWS)-1;
 									break;
 								/* favorites */
 								case MENU_LOAD:
@@ -1218,7 +1309,7 @@ void menu()
 								/* view */
 								case MENU_VIEW:
 									s++;
-									if (s > NUM_VIEWS-1) s = 0;
+									if (s > (cheat?CHEAT_VIEWS:NORMAL_VIEWS)-1) s = (cheat?NORMAL_VIEWS+1:0);
 									break;
 								/* favorites */
 								case MENU_LOAD:
@@ -1279,6 +1370,10 @@ void init()
 {
 	int flags;
 	FILE *f;
+	int action, cur = 0;
+	int joy_seq[] = { PSP_BUTTON_DOWN, PSP_BUTTON_R, PSP_BUTTON_UP, PSP_BUTTON_L, PSP_BUTTON_Y, PSP_BUTTON_B, -1 };
+	int key_seq[] = { SDLK_DOWN, SDLK_r, SDLK_UP, SDLK_l, SDLK_y, SDLK_b, -1 };
+	SDL_Event event;
 	
 	/* clear memory cache */
 	bzero(memory, sizeof(memory));
@@ -1323,29 +1418,81 @@ void init()
 	curl = curl_easy_init();
 	
 	/* setup SDL */
-	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK) == -1)
+	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK | SDL_INIT_AUDIO) == -1)
 		quit();
 	joystick = SDL_JoystickOpen(0);
 	SDL_JoystickEventState(SDL_ENABLE);
 	if (TTF_Init() == -1)
+		quit();
+	if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 1024) < 0)
 		quit();
 	
 	/* setup screen */
 	flags = SDL_HWSURFACE | SDL_ANYFORMAT | SDL_DOUBLEBUF;
 	screen = SDL_SetVideoMode(WIDTH, HEIGHT, BPP, flags);
 	SDL_FillRect(screen, NULL, BLACK);
+	#ifdef GP2X
+	prev = SDL_ConvertSurface(screen, screen->format, screen->flags);
+	next = SDL_ConvertSurface(screen, screen->format, screen->flags);
+	#else
 	prev = zoomSurface(screen, 1, 1, 0);
 	next = zoomSurface(screen, 1, 1, 0);
+	#endif
 	if (screen == NULL)
 		quit();
+	SDL_ShowCursor(SDL_DISABLE);
 	
 	/* splash screen */
-	logo = IMG_Load("data/contest.png");
+	logo = IMG_Load("data/capcom.png");
 	SDL_BlitSurface(logo, NULL, next, NULL);
 	SDL_FreeSurface(logo);
-	SDL_BlitSurface(next, NULL, screen, NULL);
-	effect(FX_FADE);
-	SDL_Delay(1500);
+	
+	/* splash sound */
+	Mix_Chunk *capcom = Mix_LoadWAV("data/capcom.wav");
+	Mix_Chunk *yo = Mix_LoadWAV("data/yo.wav");
+	int channel = Mix_PlayChannel(-1, capcom, 0);
+	int i = 0;
+	SDL_Surface *tmp;
+	
+	/* handle cheat code */
+	while (Mix_Playing(channel))
+	{
+		while (SDL_PollEvent(&event))
+		{
+			switch (event.type)
+			{
+				case SDL_JOYBUTTONDOWN:
+				case SDL_KEYDOWN:
+					if (event.type == SDL_KEYDOWN)
+						action = event.key.keysym.sym;
+					else
+						action = event.jbutton.button;
+					if (action == joy_seq[cur] || action == key_seq[cur])
+					{
+						cur++;
+						if (joy_seq[cur] == -1 || key_seq[cur] == -1)
+						{
+							Mix_PlayChannel(-1, yo, 0);
+							cheat = 1;
+						}
+					}
+					else cur = 0;
+					break;
+			}
+		}
+		i++;
+		tmp = zoomSurface(next, 1, 1, 0);
+		SDL_SetAlpha(tmp, SDL_SRCALPHA, i);
+		SDL_BlitSurface(tmp, NULL, screen, NULL);
+		SDL_FreeSurface(tmp);
+		SDL_Flip(screen);
+		#if ! ( _PSP_FW_VERSION || GP2X )
+		SDL_Delay(50);
+		#endif
+	}
+	if (cheat) s = NORMAL_VIEWS+1;
+	Mix_FreeChunk(capcom);
+	Mix_FreeChunk(yo);
 	
 	/* load textures */
 	logo = IMG_Load("data/logo.png");
@@ -1422,24 +1569,24 @@ void loop()
 							}
 							break;
 						case SDLK_F1:
-						case PSP_BUTTON_Y:
+						case PSP_BUTTON_X:
 							go();
 							display(FX_FADE);
 							break;
 						case SDLK_F2:
-						case PSP_BUTTON_X:
+						case PSP_BUTTON_Y:
 							s--;
-							if (s < 0) s = NUM_VIEWS-1;
+							if (s < (cheat?NORMAL_VIEWS+1:0)) s = (cheat?CHEAT_VIEWS:NORMAL_VIEWS)-1;
 							display(FX_FADE);
 							break;
 						case SDLK_F3:
-						case PSP_BUTTON_A:
+						case PSP_BUTTON_B:
 							s++;
-							if (s > NUM_VIEWS-1) s = 0;
+							if (s > (cheat?CHEAT_VIEWS:NORMAL_VIEWS)-1) s = (cheat?NORMAL_VIEWS+1:0);
 							display(FX_FADE);
 							break;
 						case SDLK_F4:
-						case PSP_BUTTON_B:
+						case PSP_BUTTON_A:
 							config.show_info = !config.show_info;
 							display(FX_NONE);
 							break;

@@ -33,3 +33,7 @@ PC version:
 	* You will have exactly the same display as the PSP.
 	* Arrows to move, page up/down to zoom, F1/F2/F3/F4 for buttons, escape for menu.
 	* Copy the data/ folder to your PSP.
+
+GP2X version:
+	* You will have to build a map cache on the PC before.
+	* This is just experimental, it may not work in the future...
