@@ -1,5 +1,9 @@
 Change log file for PSP-Maps
 
+version 1.1	(2008-05-01)
+	* added experimental and basic KML files support
+	* removed the buggy Google Moon visible view
+
 version 1.0	(2008-04-23)
 	* added GP2X version
 	* added Google Moon, Google Mars and Google Sky support

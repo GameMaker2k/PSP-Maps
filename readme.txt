@@ -37,3 +37,12 @@ PC version:
 GP2X version:
 	* You will have to build a map cache on the PC before.
 	* This is just experimental, it may not work in the future...
+
+KML support:
+	* Create a kml/ directory in your PSP-Maps folder.
+	* Copy the .kml files in this directory.
+	* Currently, it only supports "Points" and "Lines".
+	* If you create an .png image with the same name as your KML file, it will be used to replace the default marker.
+	* You can easily create directions with this link (replace the towns in the URL):
+		http://maps.google.com/maps?output=kml&saddr=toulouse&daddr=paris
+

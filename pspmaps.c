@@ -20,6 +20,9 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include "global.h"
+#include "kml.h"
+
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,16 +37,6 @@
 #include <SDL_mixer.h>
 #include <curl/curl.h>
 
-#define VERSION "1.0"
-
-#ifdef GP2X
-#define WIDTH 320
-#define HEIGHT 240
-#else
-#define WIDTH 480
-#define HEIGHT 272
-#endif
-
 #define BPP 32
 #define BUFFER_SIZE 200 * 1024
 #define MEMORY_CACHE_SIZE 32
@@ -55,12 +48,6 @@
 #define BLACK SDL_MapRGB(screen->format, 0, 0, 0)
 #define WHITE SDL_MapRGB(screen->format, 255, 255, 255)
 
-#if _PSP_FW_VERSION || GP2X
-#define DEBUG(x...) {}
-#else
-#define DEBUG(x...) printf(x);
-#endif
-
 #ifdef _PSP_FW_VERSION
 #include <pspkernel.h>
 #include <pspsdk.h>
@@ -70,7 +57,7 @@
 #define MODULE_NAME "PSP-Maps"
 PSP_MODULE_INFO(MODULE_NAME, 0, 1, 1);
 PSP_MAIN_THREAD_ATTR(THREAD_ATTR_USER);
-PSP_HEAP_SIZE_KB(20480);
+PSP_HEAP_SIZE_MAX();
 void quit();
 #include "netdialog.c"
 #define DANZEFF_SDL
@@ -127,6 +114,7 @@ struct
 	int use_effects;
 	int show_info;
 	int danzeff;
+	int show_kml;
 } config;
 
 /* user's favorite places */
@@ -153,10 +141,10 @@ enum
 	YH_HYBRID,
 	NORMAL_VIEWS,
 	GG_MOON_APOLLO,
-	GG_MOON_VISIBLE,
+//	GG_MOON_VISIBLE,	// very similar to GG_MOON_APOLLO, and buggy on PSP
 	GG_MOON_ELEVATION,
-	GG_MARS_ELEVATION,
 	GG_MARS_VISIBLE,
+	GG_MARS_ELEVATION,
 	GG_MARS_INFRARED,
 	GG_SKY_VISIBLE,
 	GG_SKY_INFRARED,
@@ -180,10 +168,10 @@ char *_view[CHEAT_VIEWS] = {
 	"Yahoo! Maps / Hybrid",
 	"",
 	"Google Moon / Apollo",
-	"Google Moon / Visible",
+//	"Google Moon / Visible",
 	"Google Moon / Elevation",
-	"Google Mars / Elevation",
 	"Google Mars / Visible",
+	"Google Mars / Elevation",
 	"Google Mars / Infrared",
 	"Google Sky / Visible",
 	"Google Sky / Infrared",
@@ -251,6 +239,7 @@ enum
 	MENU_SAVE,
 	MENU_DEFAULT,
 	MENU_INFO,
+	MENU_KML,
 	MENU_EFFECT,
 	MENU_KEYBOARD,
 	MENU_RADIUS,
@@ -302,509 +291,8 @@ void quit()
 	#endif
 }
 
-/* returns in buffer "b" the name of the Google Maps tile for location (x,y,z) */
-void GGtile(int x, int y, int z, char *b)
-{
-	int c = 18 - z;
-	b[c] = '\0';
-	while (z++ < 17)
-	{
-		c--;
-		if (x % 2)
-		{
-			if (y % 2)
-				b[c] = 's';
-			else
-				b[c] = 'r';
-		}
-		else
-		{
-			if (y % 2)
-				b[c] = 't';
-			else
-				b[c] = 'q';
-		}
-		x/=2;
-		y/=2;
-	}
-	b[0] = 't';
-}
-
-/* returns in buffer "b" the name of the Virtual Earth tile for location (x,y,z) */
-void VEtile(int x, int y, int z, char *b)
-{
-	int c = 17 - z;
-	b[c] = '\0';
-	while (z++ < 17)
-	{
-		c--;
-		if (x % 2)
-		{
-			if (y % 2)
-				b[c] = '3';
-			else
-				b[c] = '1';
-		}
-		else
-		{
-			if (y % 2)
-				b[c] = '2';
-			else
-				b[c] = '0';
-		}
-		x/=2;
-		y/=2;
-	}
-}
-
-/* save tile in memory cache */
-void savememory(int x, int y, int z, int s, SDL_Surface *tile)
-{
-	DEBUG("savememory(%d, %d, %d, %d)\n", x, y, z, s);
-	SDL_FreeSurface(memory[memory_idx].tile);
-	memory[memory_idx].x = x;
-	memory[memory_idx].y = y;
-	memory[memory_idx].z = z;
-	memory[memory_idx].s = s;
-	memory[memory_idx].tile = tile;
-	memory_idx = (memory_idx + 1) % MEMORY_CACHE_SIZE;
-}
-
-/* return the disk file name for cache entry
- * maximum of 1000 entries per folder to improve access speed */
-void diskname(char *buf, int n)
-{
-	/* create folders if needed */
-	sprintf(buf, "cache/%.3d", n/1000);
-	mkdir(buf, 0755);
-	/* return the full file name */
-	sprintf(buf, "cache/%.3d/%.3d.dat", n/1000, n%1000);
-}
-
-/* save tile in disk cache */
-void savedisk(int x, int y, int z, int s, SDL_RWops *rw, int n)
-{
-	FILE *f;
-	char name[50];
-	char buffer[BUFFER_SIZE];
-	
-	if (!config.cache_size) return;
-	
-	DEBUG("savedisk(%d, %d, %d, %d)\n", x, y, z, s);
-	
-	if (rw == NULL)
-	{
-		printf("warning: savedisk(NULL)!\n");
-		return;
-	}
-	
-	disk[disk_idx].x = x;
-	disk[disk_idx].y = y;
-	disk[disk_idx].z = z;
-	disk[disk_idx].s = s;
-	
-	SDL_RWseek(rw, 0, SEEK_SET);
-	diskname(name, disk_idx);
-	if ((f = fopen(name, "wb")) != NULL)
-	{
-		SDL_RWread(rw, buffer, 1, n);
-		fwrite(buffer, 1, n, f);
-		fclose(f);
-	}
-	
-	disk_idx = (disk_idx + 1) % config.cache_size;
-}
-
-/* curl callback to save in memory */
-size_t curl_write(void *ptr, size_t size, size_t nb, SDL_RWops *rw)
-{
-	int t = nb * size;
-	rw->write(rw, ptr, size, nb);
-	return t;
-}
-
-/* get the image on internet and return a buffer */
-SDL_RWops *getnet(int x, int y, int z, int s)
-{
-	char request[1024];
-	SDL_RWops *rw;
-	
-	DEBUG("getnet(%d, %d, %d, %d)\n", x, y, z, s);
-	
-	switch (s)
-	{
-		case GG_MAP:
-			sprintf(request, "http://mt%d.google.com/mt?n=404&v=w2.69&x=%d&y=%d&zoom=%d", ++balancing%4, x, y, z);
-			break;
-		case GG_SATELLITE:
-			sprintf(request, "http://kh%d.google.com/kh?n=404&v=25&t=", ++balancing%4);
-			GGtile(x, y, z, request + strlen(request));
-			break;
-		case GG_HYBRID:
-			sprintf(request, "http://mt%d.google.com/mt?n=404&v=w2t.69&x=%d&y=%d&zoom=%d", ++balancing%4, x, y, z);
-			break;
-		case GG_TERRAIN:
-			sprintf(request, "http://mt%d.google.com/mt?n=404&v=w2p.71&x=%d&y=%d&zoom=%d", ++balancing%4, x, y, z);
-			break;
-		case VE_ROAD:
-			sprintf(request, "http://tiles.virtualearth.net/tiles/r");
-			VEtile(x, y, z, request + strlen(request));
-			strcat(request, "?g=117");
-			break;
-		case VE_AERIAL:
-			sprintf(request, "http://tiles.virtualearth.net/tiles/a");
-			VEtile(x, y, z, request + strlen(request));
-			strcat(request, "?g=117");
-			break;
-		case VE_HYBRID:
-			sprintf(request, "http://tiles.virtualearth.net/tiles/h");
-			VEtile(x, y, z, request + strlen(request));
-			strcat(request, "?g=117");
-			break;
-		case VE_HILL:
-			sprintf(request, "http://tiles.virtualearth.net/tiles/r");
-			VEtile(x, y, z, request + strlen(request));
-			strcat(request, "?g=117&shading=hill");
-			break;
-		case YH_MAP:
-			sprintf(request, "http://us.maps1.yimg.com/us.tile.yimg.com/tl?v=4.1&x=%d&y=%d&z=%d", x, (int) pow(2, 16-z)-y-1, z+1);
-			break;
-		case YH_SATELLITE:
-			sprintf(request, "http://us.maps3.yimg.com/aerial.maps.yimg.com/ximg?v=1.7&t=a&x=%d&y=%d&z=%d", x, (int) pow(2, 16-z)-y-1, z+1);
-			break;
-		case YH_HYBRID:
-			sprintf(request, "http://us.maps3.yimg.com/aerial.maps.yimg.com/ximg?v=2.5&t=p&x=%d&y=%d&z=%d", x, (int) pow(2, 16-z)-y-1, z+1);
-			break;
-		case GG_MOON_APOLLO:
-			sprintf(request, "http://mw1.google.com/mw-planetary/lunar/lunarmaps_v1/apollo/%d/%d/%d.jpg", 17-z, x, (int) pow(2, 17-z)-y-1);
-			break;
-		case GG_MOON_VISIBLE:
-			sprintf(request, "http://mw1.google.com/mw-planetary/lunar/lunarmaps_v1/clem_bw/%d/%d/%d.jpg", 17-z, x, (int) pow(2, 17-z)-y-1);
-			break;
-		case GG_MOON_ELEVATION:
-			sprintf(request, "http://mw1.google.com/mw-planetary/lunar/lunarmaps_v1/terrain/%d/%d/%d.jpg", 17-z, x, (int) pow(2, 17-z)-y-1);
-			break;
-		case GG_MARS_ELEVATION:
-			sprintf(request, "http://mw1.google.com/mw-planetary/mars/elevation/");
-			GGtile(x, y, z, request + strlen(request));
-			strcat(request, ".jpg");
-			break;
-		case GG_MARS_VISIBLE:
-			sprintf(request, "http://mw1.google.com/mw-planetary/mars/visible/");
-			GGtile(x, y, z, request + strlen(request));
-			strcat(request, ".jpg");
-			break;
-		case GG_MARS_INFRARED:
-			sprintf(request, "http://mw1.google.com/mw-planetary/mars/infrared/");
-			GGtile(x, y, z, request + strlen(request));
-			strcat(request, ".jpg");
-			break;
-		case GG_SKY_VISIBLE:
-			sprintf(request, "http://mw1.google.com/mw-planetary/sky/skytiles_v1/%d_%d_%d.jpg", x, y, 17-z);
-			break;
-		case GG_SKY_INFRARED:
-			sprintf(request, "http://mw1.google.com/mw-planetary/sky/mapscontent_v1/overlayTiles/iras/zoom%d/iras_%d_%d.png", 17-z, x, y);
-			break;
-		case GG_SKY_MICROWAVE:
-			sprintf(request, "http://mw1.google.com/mw-planetary/sky/mapscontent_v1/overlayTiles/wmap/zoom%d/wmap_%d_%d.png", 17-z, x, y);
-			break;
-		case GG_SKY_HISTORICAL:
-			sprintf(request, "http://mw1.google.com/mw-planetary/sky/mapscontent_v1/overlayTiles/cassini/zoom%d/cassini_%d_%d.png", 17-z, x, y);
-			break;
-	}
-	
-	rw = SDL_RWFromMem(response, BUFFER_SIZE);
-	
-	//curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
-	curl_easy_setopt(curl, CURLOPT_USERAGENT, "Mozilla/5.0");
-	curl_easy_setopt(curl, CURLOPT_URL, request);
-	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write);
-	curl_easy_setopt(curl, CURLOPT_WRITEDATA, rw);
-	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10);
-	curl_easy_perform(curl);
-	
-	return rw;
-}
-
-/* return the tile from disk if available, or NULL */
-SDL_Surface *getdisk(int x, int y, int z, int s)
-{
-	int i;
-	char name[50];
-	DEBUG("getdisk(%d, %d, %d, %d)\n", x, y, z, s);
-	for (i = 0; i < config.cache_size; i++)
-		if (disk[i].x == x && disk[i].y == y && disk[i].z == z && disk[i].s == s)
-		{
-			diskname(name, i);
-			return IMG_Load(name);
-		}
-	return NULL;
-}
-
-/* return the tile from memory if available, or NULL */
-SDL_Surface *getmemory(int x, int y, int z, int s)
-{
-	int i;
-	DEBUG("getmemory(%d, %d, %d, %d)\n", x, y, z, s);
-	for (i = 0; i < MEMORY_CACHE_SIZE; i++)
-		if (memory[i].tile && memory[i].x == x && memory[i].y == y && memory[i].z == z && memory[i].s == s)
-			return memory[i].tile;
-	return NULL;
-}
-
-/* downloads the image from Google for location (x,y,z) with mode (s) */
-SDL_Surface* gettile(int x, int y, int z, int s)
-{
-	SDL_RWops *rw;
-	SDL_Surface *tile;
-	int n;
-	
-	/* try memory cache */
-	if ((tile = getmemory(x, y, z, s)) != NULL)
-		return tile;
-	
-	/* try disk cache */
-	if ((tile = getdisk(x, y, z, s)) != NULL)
-	{
-		if (tile == NULL)
-			tile = zoomSurface(na, 1, 1, 0);
-		savememory(x, y, z, s, tile);
-		return tile;
-	}
-	
-	/* try internet */
-	rw = getnet(x, y, z, s);
-	
-	/* load the image */
-	n = SDL_RWtell(rw);
-	SDL_RWseek(rw, 0, SEEK_SET);
-	tile = IMG_Load_RW(rw, 0);
-	SDL_RWseek(rw, 0, SEEK_SET);
-	
-	/* if there is no tile, copy the n/a image
-	 * I use a dummy call to zoomSurface to copy the surface
-	 * because I had issues with SDL_DisplayFormat() on PSP */
-	if (tile == NULL)
-		tile = zoomSurface(na, 1, 1, 0);
-	/* only save on disk if not n/a
-	 * to avoid filling the cache with wrong images
-	 * when we are offline */
-	else
-		savedisk(x, y, z, s, rw, n);
-	savememory(x, y, z, s, tile);
-	
-	SDL_RWclose(rw);
-	
-	return tile;
-}
-
-/* prints a message using the bitmap font */
-void print(SDL_Surface *dst, int x, int y, char *text)
-{
-	SDL_Rect pos;
-	SDL_Surface *src;
-	SDL_Color color = {255, 255, 255};
-	if (font == NULL) return;
-	pos.x = x;
-	pos.y = y;
-	src = TTF_RenderText_Blended(font, text, color);
-	SDL_BlitSurface(src, NULL, dst, &pos);
-	SDL_FreeSurface(src);
-}
-
-/* input text */
-void input(SDL_Surface *dst, int x, int y, char *text, int max)
-{
-	SDL_Event event;
-	int action, active = 0, flip;
-	int up = 0, down = 0;
-	
-	void update()
-	{
-		SDL_Rect pos;
-		int xx, yy;
-		char tmp;
-		
-		TTF_SizeText(font, text, &xx, &yy);
-		pos.x = x;
-		pos.y = y;
-		pos.w = WIDTH - x*2;
-		pos.h = yy;
-		SDL_FillRect(dst, &pos, BLACK);
-		
-		print(dst, x, y, text);
-		/* display blinking cursor */
-		if (flip / 5 % 2)
-		{
-			tmp = text[active];
-			text[active] = '\0';
-			TTF_SizeText(font, text, &xx, &yy);
-			print(dst, x+xx, y, "_");
-			text[active] = tmp;
-		}
-		flip++;
-		SDL_BlitSurface(dst, NULL, screen, NULL);
-		SDL_Flip(screen);
-	}
-	
-	#ifdef _PSP_FW_VERSION
-	/* danzeff */
-	if (config.danzeff)
-	{
-		strcpy(text, "");
-		danzeff_load();
-		danzeff_set_screen(dst);
-		danzeff_moveTo(165, 110);
-		
-		for (;;)
-		{
-			SceCtrlData ctrl = getCtrlFromJoystick(joystick);
-			int c = danzeff_readInput(ctrl);
-			
-			switch (c)
-			{
-				case 0:
-					break;
-				case '\10':
-				case DANZEFF_LEFT:
-					if (active > 0)
-					{
-						active--;
-						text[active] = '\0';
-					}
-					break;
-				case DANZEFF_RIGHT:
-					if (active < max)
-					{
-						text[active] = ' ';
-						active++;
-						text[active] = '\0';
-					}
-					break;
-				case DANZEFF_SELECT:
-				case DANZEFF_START:
-					return;
-				default:
-					if (active < max)
-					{
-						text[active] = c;
-						active++;
-						text[active] = '\0';
-					}
-					break;
-			}
-			
-			danzeff_render();
-			update();
-			SDL_Delay(50);
-			
-			/* flush events */
-			while (SDL_PollEvent(&event));
-		}
-	}
-	else	
-	#endif
-	
-	/* arcade */
-	{
-		strcpy(text, " ");
-		for (;;)
-		{
-			while (SDL_PollEvent(&event))
-			{
-				switch (event.type)
-				{
-					case SDL_QUIT:
-						quit();
-						break;
-					case SDL_KEYDOWN:
-					case SDL_JOYBUTTONDOWN:
-						if (event.type == SDL_KEYDOWN)
-							action = event.key.keysym.sym;
-						else
-							action = event.jbutton.button;
-						switch (action)
-						{
-							case SDLK_ESCAPE:
-							case SDLK_SPACE:
-							case PSP_BUTTON_START:
-								return;
-							case SDLK_LEFT:
-							case PSP_BUTTON_LEFT:
-							case PSP_BUTTON_L:
-							case PSP_BUTTON_A:
-								if (active > 0)
-								{
-									text[active] = '\0';
-									active--;
-								}
-								break;
-							case SDLK_RIGHT:
-							case PSP_BUTTON_RIGHT:
-							case PSP_BUTTON_R:
-							case PSP_BUTTON_B:
-							case PSP_BUTTON_Y:
-							case PSP_BUTTON_X:
-								if (active < max)
-								{
-									active++;
-									text[active] = ' ';
-									text[active+1] = '\0';
-								}
-								break;
-							case SDLK_UP:
-							case PSP_BUTTON_UP:
-								up = 1;
-								break;
-							case SDLK_DOWN:
-							case PSP_BUTTON_DOWN:
-								down = 1;
-								break;
-							default:
-								break;
-						}
-						break;
-					case SDL_KEYUP:
-					case SDL_JOYBUTTONUP:
-						if (event.type == SDL_KEYUP)
-							action = event.key.keysym.sym;
-						else
-							action = event.jbutton.button;
-						switch (action)
-						{
-							case SDLK_UP:
-							case PSP_BUTTON_UP:
-								up = 0;
-								break;
-							case SDLK_DOWN:
-							case PSP_BUTTON_DOWN:
-								down = 0;
-								break;
-						}
-						break;
-				}
-			}
-			if (up == 1 || up > 10)
-			{
-				if ((text[active] >= 'A' && text[active] < 'Z') || (text[active] >= '0' && text[active] < '9')) text[active]++;
-				else if (text[active] == 'Z') text[active] = '0';
-				else if (text[active] == '9') text[active] = ' ';
-				else if (text[active] == ' ') text[active] = 'A';
-			}
-			if (up) up++;
-			if (down == 1 || down > 10)
-			{
-				if ((text[active] > 'A' && text[active] <= 'Z') || (text[active] > '0' && text[active] <= '9')) text[active]--;
-				else if (text[active] == 'A') text[active] = ' ';
-				else if (text[active] == ' ') text[active] = '9';
-				else if (text[active] == '0') text[active] = 'Z';
-			}
-			if (down) down++;
-			update();
-			SDL_Delay(50);
-		}
-	}
-}
+#include "tile.c"
+#include "io.c"
 
 /* displays a box centered at a specific position */
 void box(SDL_Surface *dst, int x, int y, int w, int h, int sh)
@@ -1025,6 +513,7 @@ void display(int fx)
 	
 	/* show informations */
 	if (config.show_info) info();
+	if (config.show_kml) kml_display(screen, x, y, z);
 	
 	SDL_Flip(screen);
 }
@@ -1072,12 +561,8 @@ void go()
 	if (ret == 4 && code == 200)
 	{
 		DEBUG("precision: %d, lat: %f, lon: %f\n", precision, lat, lon);
-		float e = sin(lat * M_PI / 180);
-  		if (e > 0.9999) e = 0.9999;
-  		if (e < -0.9999) e = -0.9999;
 		z = _zoom[precision];
-		x = pow(2, 17-z) * (lon + 180) / 360;
-		y = pow(2, 16-z) * (1 - log((1 + e)/(1 - e)) / 2 / M_PI);
+		latlon2xy(lat, lon, &x, &y, z);
 	}
 	
 	SDL_RWclose(rw);
@@ -1118,6 +603,7 @@ void menu()
 		ENTRY(MENU_SAVE, "Save favorite: %d", fav+1);
 		ENTRY(MENU_DEFAULT, "Default view");
 		ENTRY(MENU_INFO, "Show informations: %s", config.show_info ? "Yes" : "No");
+		ENTRY(MENU_KML, "Show KML data: %s", config.show_kml ? "Yes" : "No");
 		ENTRY(MENU_EFFECT, "Transition effects: %s", config.use_effects ? "Yes" : "No");
 		ENTRY(MENU_KEYBOARD, "Keyboard type: %s", config.danzeff ? "Danzeff" : "Arcade");
 		ENTRY(MENU_RADIUS, "Cache neighborhood radius: %d", radius);
@@ -1189,6 +675,10 @@ void menu()
 								/* infos */
 								case MENU_INFO:
 									config.show_info = !config.show_info;
+									break;
+								/* KML */
+								case MENU_KML:
+									config.show_kml = !config.show_kml;
 									break;
 								/* effects */
 								case MENU_EFFECT:
@@ -1279,6 +769,10 @@ void menu()
 								case MENU_INFO:
 									config.show_info = !config.show_info;
 									break;
+								/* KML */
+								case MENU_KML:
+									config.show_kml = !config.show_kml;
+									break;
 								/* effects */
 								case MENU_EFFECT:
 									config.use_effects = !config.use_effects;
@@ -1320,6 +814,10 @@ void menu()
 								/* infos */
 								case MENU_INFO:
 									config.show_info = !config.show_info;
+									break;
+								/* KML */
+								case MENU_KML:
+									config.show_kml = !config.show_kml;
 									break;
 								/* effects */
 								case MENU_EFFECT:
@@ -1382,6 +880,7 @@ void init()
 	config.cache_size = 1600;
 	config.use_effects = 1;
 	config.show_info = 0;
+	config.show_kml = 0;
 	config.danzeff = 1;
 	
 	/* load configuration if available */
@@ -1499,6 +998,9 @@ void init()
 	na = IMG_Load("data/na.png");
 	zoom = IMG_Load("data/zoom.png");
 	font = TTF_OpenFont("data/font.ttf", 11);
+	
+	/* load KML */
+	kml_load();
 	
 	/* display initial map */
 	display(FX_FADE);

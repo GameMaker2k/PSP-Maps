@@ -1,5 +1,5 @@
 TARGET = PSP-Maps
-OBJS = pspmaps.o
+OBJS = pspmaps.o global.o kml.o
 
 PSP_FW_VERSION = 371
 BUILD_PRX = 1
@@ -19,11 +19,12 @@ PSP_EBOOT_PIC1 = screenshot.png
 PSPSDK=$(shell psp-config --pspsdk-path)
 PSPBIN = $(PSPSDK)/../bin
 
-CFLAGS += -I/usr/local/pspdev/psp/include/SDL $(shell $(PSPBIN)/curl-config --cflags)
+CFLAGS += -I/usr/local/pspdev/psp/include/SDL $(shell $(PSPBIN)/curl-config --cflags) $(shell $(PSPBIN)/xml2-config --cflags)
 
 LIBS = -lc -lSDL_image -lSDL_gfx -lSDL_ttf -lSDL_mixer -lpng -ljpeg -lSDL -lcurl -lfreetype
 LIBS += $(shell $(PSPBIN)/sdl-config --libs)
 LIBS += $(shell $(PSPBIN)/curl-config --libs)
+LIBS += $(shell $(PSPBIN)/xml2-config --libs)
 LIBS += -lpspwlan -lpsputility -lpspgum -lpspgu -lm
 
 include $(PSPSDK)/lib/build.mak
