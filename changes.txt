@@ -1,5 +1,9 @@
 Change log file for PSP-Maps
 
+version 1.2	(2008-05-29)
+	* fixed Google Map views
+	* added window title and icon for PC version
+
 version 1.1	(2008-05-01)
 	* added experimental and basic KML files support
 	* removed the buggy Google Moon visible view

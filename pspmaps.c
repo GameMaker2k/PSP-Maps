@@ -926,6 +926,11 @@ void init()
 	if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 1024) < 0)
 		quit();
 	
+	#include "icon.xpm"
+	SDL_WM_SetIcon(IMG_ReadXPMFromArray(icon_xpm), NULL);
+	SDL_WM_SetCaption("PSP-Maps " VERSION, "PSP-Maps " VERSION);
+	SDL_ShowCursor(SDL_DISABLE);
+	
 	/* setup screen */
 	flags = SDL_HWSURFACE | SDL_ANYFORMAT | SDL_DOUBLEBUF;
 	screen = SDL_SetVideoMode(WIDTH, HEIGHT, BPP, flags);
@@ -939,7 +944,6 @@ void init()
 	#endif
 	if (screen == NULL)
 		quit();
-	SDL_ShowCursor(SDL_DISABLE);
 	
 	/* splash screen */
 	logo = IMG_Load("data/capcom.png");
