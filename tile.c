@@ -133,7 +133,7 @@ SDL_RWops *getnet(int x, int y, int z, int s)
 			sprintf(request, "http://mt%d.google.com/mt?n=404&v=w2.75&x=%d&y=%d&zoom=%d", ++balancing%4, x, y, z);
 			break;
 		case GG_SATELLITE:
-			sprintf(request, "http://kh%d.google.com/kh?n=404&v=28&t=", ++balancing%4);
+			sprintf(request, "http://khm%d.google.com/kh?v=30&t=", ++balancing%4);
 			GGtile(x, y, z, request + strlen(request));
 			break;
 		case GG_HYBRID:
