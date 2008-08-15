@@ -112,8 +112,9 @@ void savedisk(int x, int y, int z, int s, SDL_RWops *rw, int n)
 }
 
 /* curl callback to save in memory */
-size_t curl_write(void *ptr, size_t size, size_t nb, SDL_RWops *rw)
+size_t curl_write(void *ptr, size_t size, size_t nb, void *stream)
 {
+	SDL_RWops *rw = stream;
 	int t = nb * size;
 	rw->write(rw, ptr, size, nb);
 	return t;
