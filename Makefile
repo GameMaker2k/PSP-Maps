@@ -17,4 +17,4 @@ icon.o: icon.rc
 	$(WINDRES) -i icon.rc -o icon.o
 
 clean:
-	rm -f pspmaps pspmaps.exe *.o PSP-Maps.prx PSP-Maps.elf PARAM.SFO EBOOT.PBP pspmaps.gpu
+	rm -rf pspmaps pspmaps.exe *.o PSP-Maps.prx PSP-Maps.elf PARAM.SFO EBOOT.PBP pspmaps.gpu cache/ data/*.dat
