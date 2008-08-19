@@ -53,6 +53,7 @@
 #include <pspsdk.h>
 #include <psputility.h>
 #include <pspnet_apctl.h>
+#include <motion.h>
 #define printf pspDebugScreenPrintf
 #define MODULE_NAME "PSP-Maps"
 PSP_MODULE_INFO(MODULE_NAME, 0, 1, 1);
@@ -1183,11 +1184,38 @@ void loop()
 		dx = SDL_JoystickGetAxis(joystick, 0);
 		if (abs(dx) < JOYSTICK_DEAD) dx = 0; else dx -= abs(dx)/dx * JOYSTICK_DEAD;
 		dx *= JOYSTICK_STEP / (32768 - JOYSTICK_DEAD);
-		x += dx;
 		
 		dy = SDL_JoystickGetAxis(joystick, 1);
 		if (abs(dy) < JOYSTICK_DEAD) dy = 0; else dy -= abs(dy)/dy * JOYSTICK_DEAD;
 		dy *= JOYSTICK_STEP / (32768 - JOYSTICK_DEAD);
+		
+		#ifdef _PSP_FW_VERSION
+		if (motionExists())
+		{
+			motionAccelData accel;
+			motionGetAccel(&accel);
+			dx -= (accel.x - 128) / 200.0;
+			dy += (accel.y - 128) / 200.0;
+			if (accel.z < 140)
+			if (z > -4)
+			{
+				z--;
+				x*=2;
+				y*=2;
+				display(FX_IN);
+			}
+			if (accel.z > 180)
+			if (z < 16)
+			{
+				z++;
+				x/=2;
+				y/=2;
+				display(FX_OUT);
+			}
+		}
+		#endif
+		
+		x += dx;
 		y += dy;
 		
 		if (dx || dy) display(FX_NONE);
@@ -1200,6 +1228,7 @@ int main(int argc, char *argv[])
 {
 	#ifdef _PSP_FW_VERSION
 	pspDebugScreenInit();
+	motionLoad();
 	sceUtilityLoadNetModule(PSP_NET_MODULE_COMMON);
 	sceUtilityLoadNetModule(PSP_NET_MODULE_INET);
 	netInit();
