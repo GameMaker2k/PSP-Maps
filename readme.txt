@@ -51,3 +51,8 @@ URL updating:
 	* If Google Maps does not work anymore, try updating this file with the latest version.
 	* You can now use Google China, replace the first line by:
 		http://mt%d.google.cn/mt?v=cn1.4&x=%d&y=%d&zoom=%d
+
+Motion Kit:
+	* Since version 1.3 you can use the PSP Motion Kit with PSP-Maps.
+	* Tilting the PSP will allow you to move on the map.
+	* Moving the PSP quickly up or down will allow you to zoom.

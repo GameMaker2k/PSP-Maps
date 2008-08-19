@@ -1,5 +1,12 @@
 Change log file for PSP-Maps
 
+version 1.3	(2008-08-20)
+	* fixed Google views
+	* moved all urls to file urls.txt for easier upgrading
+	* added directions entry to the menu
+	* added motion kit support
+	* new splash screen for the NEO Summer Compo 2008
+
 version 1.2	(2008-05-29)
 	* fixed Google Map views
 	* added window title and icon for PC version
