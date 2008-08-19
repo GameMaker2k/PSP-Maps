@@ -58,8 +58,18 @@ void kml_parse(char *file)
 	xmlNode *node, *cur;
 
 	doc = xmlReadFile(file, NULL, 0);
+	if (doc == NULL)
+	{
+		DEBUG("KML error: no document!\n");
+		return;
+	}
 
 	node = xmlDocGetRootElement(doc);
+	if (node == NULL)
+	{
+		DEBUG("KML error: no root element!\n");
+		return;
+	}
 	
 	/* check the XML document starts with the KML node */
 	if (strcmp((char *) node->name, "kml"))

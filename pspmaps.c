@@ -236,6 +236,7 @@ enum
 {
 	MENU_VIEW,
 	MENU_ADDRESS,
+	MENU_DIRECTIONS,
 	MENU_LOAD,
 	MENU_SAVE,
 	MENU_DEFAULT,
@@ -522,7 +523,7 @@ void display(int fx)
 /* lookup address */
 void go()
 {
-	char request[1024], address[50];
+	char request[1024], buffer[50], *address;
 	SDL_RWops *rw;
 	int i, ret, code, precision;
 	float lat, lon;
@@ -540,12 +541,12 @@ void go()
 	
 	box(next, WIDTH/2, HEIGHT/2 - 60, 400, 80, 200);
 	print(next, 50, HEIGHT/2 - 90, "Enter address, up/down to change letters, start to validate: ");
-	input(next, 50, HEIGHT/2 - 60, address, 46);
+	input(next, 50, HEIGHT/2 - 60, buffer, 46);
+	DEBUG("address: %s\n", buffer);
+	address = curl_easy_escape(curl, buffer, 0);
 	
-	DEBUG("go(%s)\n", address);
-	
-	for (i = 0; i < strlen(address); i++) if (address[i] == ' ') address[i] = '+';
 	sprintf(request, "http://maps.google.com/maps/geo?output=csv&key=%s&q=%s", gkey, address);
+	free(address);
 	
 	rw = SDL_RWFromMem(response, BUFFER_SIZE);
 	
@@ -567,6 +568,49 @@ void go()
 	}
 	
 	SDL_RWclose(rw);
+}
+
+/* calculate directions */
+void directions()
+{
+	char request[1024], buffer[50], *departure, *destination;
+	FILE *kml;
+	
+	box(next, WIDTH/2, HEIGHT/2 - 60, 400, 80, 200);
+	print(next, 50, HEIGHT/2 - 90, "Enter departure address: ");
+	input(next, 50, HEIGHT/2 - 60, buffer, 46);
+	DEBUG("departure: %s\n", buffer);
+	departure = curl_easy_escape(curl, buffer, 0);
+	
+	box(next, WIDTH/2, HEIGHT/2 - 60, 400, 80, 200);
+	print(next, 50, HEIGHT/2 - 90, "Enter destination address: ");
+	input(next, 50, HEIGHT/2 - 60, buffer, 46);
+	DEBUG("destination: %s\n", buffer);
+	destination = curl_easy_escape(curl, buffer, 0);
+	
+	sprintf(request, "http://maps.google.com/maps?output=kml&saddr=%s&daddr=%s", departure, destination);
+	free(departure);
+	free(destination);
+	
+	if ((kml = fopen("kml/route.kml", "w")) == NULL)
+	{
+		DEBUG("cannot open/create kml/route.kml\n");
+		return;
+	}
+	
+	//curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
+	curl_easy_setopt(curl, CURLOPT_USERAGENT, "Mozilla/5.0");
+	curl_easy_setopt(curl, CURLOPT_URL, request);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, kml);
+	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10);
+	curl_easy_perform(curl);
+	
+	fclose(kml);
+	
+	kml_parse("kml/route.kml");
+	
+	/* force KML display */
+	config.show_kml = 1;
 }
 
 /* menu to load/save favorites */
@@ -600,6 +644,7 @@ void menu()
 		print(next, MENU_LEFT-20, MENU_TOP + active * MENU_Y, ">");
 		ENTRY(MENU_VIEW, "Current view: %s", _view[s]);
 		ENTRY(MENU_ADDRESS, "Enter address...");
+		ENTRY(MENU_DIRECTIONS, "Get directions...");
 		ENTRY(MENU_LOAD, "Load favorite: %d", fav+1);
 		ENTRY(MENU_SAVE, "Save favorite: %d", fav+1);
 		ENTRY(MENU_DEFAULT, "Default view");
@@ -647,6 +692,10 @@ void menu()
 								/* enter address */
 								case MENU_ADDRESS:
 									go();
+									return;
+								/* get directions */
+								case MENU_DIRECTIONS:
+									directions();
 									return;
 								/* load favorite */
 								case MENU_LOAD:
@@ -906,6 +955,9 @@ void init()
 	
 	/* create disk cache directory if needed */
 	mkdir("cache", 0755);
+	
+	/* create kml directory if needed */
+	mkdir("kml", 0755);
 	
 	/* load favorites if available */
 	bzero(favorite, sizeof(favorite));
