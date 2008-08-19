@@ -46,3 +46,8 @@ KML support:
 	* You can easily create directions with this link (replace the towns in the URL):
 		http://maps.google.com/maps?output=kml&saddr=toulouse&daddr=paris
 
+URL updating:
+	* The file "urls.txt" contains the list of addresses used by PSP-Maps to retrieve the images.
+	* If Google Maps does not work anymore, try updating this file with the latest version.
+	* You can now use Google China, replace the first line by:
+		http://mt%d.google.cn/mt?v=cn1.4&x=%d&y=%d&zoom=%d

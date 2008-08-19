@@ -141,7 +141,6 @@ enum
 	YH_HYBRID,
 	NORMAL_VIEWS,
 	GG_MOON_APOLLO,
-//	GG_MOON_VISIBLE,	// very similar to GG_MOON_APOLLO, and buggy on PSP
 	GG_MOON_ELEVATION,
 	GG_MARS_VISIBLE,
 	GG_MARS_ELEVATION,
@@ -168,7 +167,6 @@ char *_view[CHEAT_VIEWS] = {
 	"Yahoo! Maps / Hybrid",
 	"",
 	"Google Moon / Apollo",
-//	"Google Moon / Visible",
 	"Google Moon / Elevation",
 	"Google Mars / Visible",
 	"Google Mars / Elevation",
@@ -178,6 +176,9 @@ char *_view[CHEAT_VIEWS] = {
 	"Google Sky / Microwave",
 	"Google Sky / Historical",
 };
+
+/* urls for services, loaded from urls.txt */
+char *_url[CHEAT_VIEWS];
 
 /* PSP buttons list */
 #ifdef GP2X
@@ -868,10 +869,11 @@ void init()
 {
 	int flags;
 	FILE *f;
-	int action, cur = 0;
+	int i, action, cur = 0;
 	int joy_seq[] = { PSP_BUTTON_DOWN, PSP_BUTTON_R, PSP_BUTTON_UP, PSP_BUTTON_L, PSP_BUTTON_Y, PSP_BUTTON_B, -1 };
 	int key_seq[] = { SDLK_DOWN, SDLK_r, SDLK_UP, SDLK_l, SDLK_y, SDLK_b, -1 };
 	SDL_Event event;
+	char buffer[1024];
 	
 	/* clear memory cache */
 	bzero(memory, sizeof(memory));
@@ -926,6 +928,24 @@ void init()
 	if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 1024) < 0)
 		quit();
 	
+	/* load urls for services */
+	if ((f = fopen("urls.txt", "r")) == NULL)
+	{
+		DEBUG("cannot open urls file!\n");
+		quit();
+	}
+	for (i = 0; i < CHEAT_VIEWS; i++) if (i != NORMAL_VIEWS)
+	{
+		if (fscanf(f, "%s", buffer) != 1)
+		{
+			DEBUG("cannot read url for %s\n", _view[i]);
+			quit();
+		}
+		_url[i] = malloc(strlen(buffer) + 1);
+		strcpy(_url[i], buffer);
+	}
+	fclose(f);
+	
 	#include "icon.xpm"
 	SDL_WM_SetIcon(IMG_ReadXPMFromArray(icon_xpm), NULL);
 	SDL_WM_SetCaption("PSP-Maps " VERSION, "PSP-Maps " VERSION);
@@ -954,7 +974,7 @@ void init()
 	Mix_Chunk *capcom = Mix_LoadWAV("data/capcom.wav");
 	Mix_Chunk *yo = Mix_LoadWAV("data/yo.wav");
 	int channel = Mix_PlayChannel(-1, capcom, 0);
-	int i = 0;
+	i = 0;
 	SDL_Surface *tmp;
 	
 	/* handle cheat code */

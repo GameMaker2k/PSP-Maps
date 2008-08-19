@@ -1,6 +1,7 @@
 /* returns in buffer "b" the name of the Google Maps tile for location (x,y,z) */
-void GGtile(int x, int y, int z, char *b)
+char *GGtile(int x, int y, int z)
 {
+	static char b[99];
 	int c = 18 - z;
 	b[c] = '\0';
 	while (z++ < 17)
@@ -24,11 +25,13 @@ void GGtile(int x, int y, int z, char *b)
 		y/=2;
 	}
 	b[0] = 't';
+	return b;
 }
 
 /* returns in buffer "b" the name of the Virtual Earth tile for location (x,y,z) */
-void VEtile(int x, int y, int z, char *b)
+char *VEtile(int x, int y, int z)
 {
+	static char b[99];
 	int c = 17 - z;
 	b[c] = '\0';
 	while (z++ < 17)
@@ -51,6 +54,7 @@ void VEtile(int x, int y, int z, char *b)
 		x/=2;
 		y/=2;
 	}
+	return b;
 }
 
 /* save tile in memory cache */
@@ -131,84 +135,42 @@ SDL_RWops *getnet(int x, int y, int z, int s)
 	switch (s)
 	{
 		case GG_MAP:
-			sprintf(request, "http://mt%d.google.com/mt?n=404&v=w2.75&x=%d&y=%d&zoom=%d", ++balancing%4, x, y, z);
+			sprintf(request, _url[s], ++balancing%4, x, y, z);
 			break;
 		case GG_SATELLITE:
-			sprintf(request, "http://khm%d.google.com/kh?v=30&t=", ++balancing%4);
-			GGtile(x, y, z, request + strlen(request));
+			sprintf(request, _url[s], ++balancing%4, GGtile(x, y, z));
 			break;
 		case GG_HYBRID:
-			sprintf(request, "http://mt%d.google.com/mt?n=404&v=w2t.75&x=%d&y=%d&zoom=%d", ++balancing%4, x, y, z);
-			break;
 		case GG_TERRAIN:
-			sprintf(request, "http://mt%d.google.com/mt?n=404&v=w2p.71&x=%d&y=%d&zoom=%d", ++balancing%4, x, y, z);
+			sprintf(request, _url[s], ++balancing%4, x, y, z);
 			break;
 		case VE_ROAD:
-			sprintf(request, "http://tiles.virtualearth.net/tiles/r");
-			VEtile(x, y, z, request + strlen(request));
-			strcat(request, "?g=117");
-			break;
 		case VE_AERIAL:
-			sprintf(request, "http://tiles.virtualearth.net/tiles/a");
-			VEtile(x, y, z, request + strlen(request));
-			strcat(request, "?g=117");
-			break;
 		case VE_HYBRID:
-			sprintf(request, "http://tiles.virtualearth.net/tiles/h");
-			VEtile(x, y, z, request + strlen(request));
-			strcat(request, "?g=117");
-			break;
 		case VE_HILL:
-			sprintf(request, "http://tiles.virtualearth.net/tiles/r");
-			VEtile(x, y, z, request + strlen(request));
-			strcat(request, "?g=117&shading=hill");
+			sprintf(request, _url[s], VEtile(x, y, z));
 			break;
 		case YH_MAP:
-			sprintf(request, "http://us.maps1.yimg.com/us.tile.yimg.com/tl?v=4.1&x=%d&y=%d&z=%d", x, (int) pow(2, 16-z)-y-1, z+1);
-			break;
 		case YH_SATELLITE:
-			sprintf(request, "http://us.maps3.yimg.com/aerial.maps.yimg.com/ximg?v=1.7&t=a&x=%d&y=%d&z=%d", x, (int) pow(2, 16-z)-y-1, z+1);
-			break;
 		case YH_HYBRID:
-			sprintf(request, "http://us.maps3.yimg.com/aerial.maps.yimg.com/ximg?v=2.5&t=p&x=%d&y=%d&z=%d", x, (int) pow(2, 16-z)-y-1, z+1);
+			sprintf(request, _url[s], x, (int) pow(2, 16-z)-y-1, z+1);
 			break;
 		case GG_MOON_APOLLO:
-			sprintf(request, "http://mw1.google.com/mw-planetary/lunar/lunarmaps_v1/apollo/%d/%d/%d.jpg", 17-z, x, (int) pow(2, 17-z)-y-1);
-			break;
-		/*
-		case GG_MOON_VISIBLE:
-			sprintf(request, "http://mw1.google.com/mw-planetary/lunar/lunarmaps_v1/clem_bw/%d/%d/%d.jpg", 17-z, x, (int) pow(2, 17-z)-y-1);
-			break;
-		*/
 		case GG_MOON_ELEVATION:
-			sprintf(request, "http://mw1.google.com/mw-planetary/lunar/lunarmaps_v1/terrain/%d/%d/%d.jpg", 17-z, x, (int) pow(2, 17-z)-y-1);
+			sprintf(request, _url[s], 17-z, x, (int) pow(2, 17-z)-y-1);
 			break;
 		case GG_MARS_ELEVATION:
-			sprintf(request, "http://mw1.google.com/mw-planetary/mars/elevation/");
-			GGtile(x, y, z, request + strlen(request));
-			strcat(request, ".jpg");
-			break;
 		case GG_MARS_VISIBLE:
-			sprintf(request, "http://mw1.google.com/mw-planetary/mars/visible/");
-			GGtile(x, y, z, request + strlen(request));
-			strcat(request, ".jpg");
-			break;
 		case GG_MARS_INFRARED:
-			sprintf(request, "http://mw1.google.com/mw-planetary/mars/infrared/");
-			GGtile(x, y, z, request + strlen(request));
-			strcat(request, ".jpg");
+			sprintf(request, _url[s], GGtile(x, y, z));
 			break;
 		case GG_SKY_VISIBLE:
-			sprintf(request, "http://mw1.google.com/mw-planetary/sky/skytiles_v1/%d_%d_%d.jpg", x, y, 17-z);
+			sprintf(request, _url[s], x, y, 17-z);
 			break;
 		case GG_SKY_INFRARED:
-			sprintf(request, "http://mw1.google.com/mw-planetary/sky/mapscontent_v1/overlayTiles/iras/zoom%d/iras_%d_%d.png", 17-z, x, y);
-			break;
 		case GG_SKY_MICROWAVE:
-			sprintf(request, "http://mw1.google.com/mw-planetary/sky/mapscontent_v1/overlayTiles/wmap/zoom%d/wmap_%d_%d.png", 17-z, x, y);
-			break;
 		case GG_SKY_HISTORICAL:
-			sprintf(request, "http://mw1.google.com/mw-planetary/sky/mapscontent_v1/overlayTiles/cassini/zoom%d/cassini_%d_%d.png", 17-z, x, y);
+			sprintf(request, _url[s], 17-z, x, y);
 			break;
 	}
 	
