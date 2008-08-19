@@ -525,7 +525,7 @@ void go()
 {
 	char request[1024], buffer[50], *address;
 	SDL_RWops *rw;
-	int i, ret, code, precision;
+	int ret, code, precision;
 	float lat, lon;
 	char _zoom[9] = {
 		16,	// unknown
@@ -543,7 +543,7 @@ void go()
 	print(next, 50, HEIGHT/2 - 90, "Enter address, up/down to change letters, start to validate: ");
 	input(next, 50, HEIGHT/2 - 60, buffer, 46);
 	DEBUG("address: %s\n", buffer);
-	address = curl_easy_escape(curl, buffer, 0);
+	address = curl_escape(buffer, 0);
 	
 	sprintf(request, "http://maps.google.com/maps/geo?output=csv&key=%s&q=%s", gkey, address);
 	free(address);
@@ -580,13 +580,13 @@ void directions()
 	print(next, 50, HEIGHT/2 - 90, "Enter departure address: ");
 	input(next, 50, HEIGHT/2 - 60, buffer, 46);
 	DEBUG("departure: %s\n", buffer);
-	departure = curl_easy_escape(curl, buffer, 0);
+	departure = curl_escape(buffer, 0);
 	
 	box(next, WIDTH/2, HEIGHT/2 - 60, 400, 80, 200);
 	print(next, 50, HEIGHT/2 - 90, "Enter destination address: ");
 	input(next, 50, HEIGHT/2 - 60, buffer, 46);
 	DEBUG("destination: %s\n", buffer);
-	destination = curl_easy_escape(curl, buffer, 0);
+	destination = curl_escape(buffer, 0);
 	
 	sprintf(request, "http://maps.google.com/maps?output=kml&saddr=%s&daddr=%s", departure, destination);
 	free(departure);
