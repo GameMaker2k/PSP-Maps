@@ -1019,7 +1019,7 @@ void init()
 		quit();
 	
 	/* splash screen */
-	logo = IMG_Load("data/capcom.png");
+	logo = IMG_Load("data/neoflash.png");
 	SDL_BlitSurface(logo, NULL, next, NULL);
 	SDL_FreeSurface(logo);
 	
