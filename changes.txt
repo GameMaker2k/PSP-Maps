@@ -1,5 +1,9 @@
 Change log file for PSP-Maps
 
+version 1.4	(2008-08-24)
+	* fixed get directions crash
+	* you can now save favorites with names
+
 version 1.3	(2008-08-20)
 	* fixed Google views
 	* moved all urls to file urls.txt for easier upgrading
