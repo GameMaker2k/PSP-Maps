@@ -43,7 +43,7 @@
 #define DIGITAL_STEP 0.5
 #define JOYSTICK_STEP 0.05
 #define JOYSTICK_DEAD 10000
-#define NUM_FAVORITES 9
+#define NUM_FAVORITES 99
 
 #define BLACK SDL_MapRGB(screen->format, 0, 0, 0)
 #define WHITE SDL_MapRGB(screen->format, 255, 255, 255)
@@ -649,8 +649,8 @@ void menu()
 		ENTRY(MENU_VIEW, "Current view: %s", _view[s]);
 		ENTRY(MENU_ADDRESS, "Enter address...");
 		ENTRY(MENU_DIRECTIONS, "Get directions...");
-		ENTRY(MENU_LOAD, "Load favorite: %d", fav+1);
-		ENTRY(MENU_SAVE, "Save favorite: %d", fav+1);
+		ENTRY(MENU_LOAD, "Load favorite: (%d) %s", fav+1, favorite[fav].name);
+		ENTRY(MENU_SAVE, "Save favorite: (%d) %s", fav+1, favorite[fav].name);
 		ENTRY(MENU_DEFAULT, "Default view");
 		ENTRY(MENU_INFO, "Show informations: %s", config.show_info ? "Yes" : "No");
 		ENTRY(MENU_KML, "Show KML data: %s", config.show_kml ? "Yes" : "No");
@@ -713,6 +713,9 @@ void menu()
 									return;
 								/* save favorite */
 								case MENU_SAVE:
+									box(next, WIDTH/2, HEIGHT/2 - 60, 400, 80, 200);
+									print(next, 50, HEIGHT/2 - 90, "Enter the name for this favorite: ");
+									input(next, 50, HEIGHT/2 - 60, favorite[fav].name, 46);
 									favorite[fav].ok = 1;
 									favorite[fav].x = x;
 									favorite[fav].y = y;
