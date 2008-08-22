@@ -602,6 +602,7 @@ void directions()
 	//curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
 	curl_easy_setopt(curl, CURLOPT_USERAGENT, "Mozilla/5.0");
 	curl_easy_setopt(curl, CURLOPT_URL, request);
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, NULL);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, kml);
 	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10);
 	curl_easy_perform(curl);
