@@ -609,7 +609,9 @@ void directions()
 	
 	fclose(kml);
 	
-	kml_parse("kml/route.kml");
+	/* reload KML files */
+	kml_free();
+	kml_load();
 	
 	/* force KML display */
 	config.show_kml = 1;

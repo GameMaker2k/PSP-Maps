@@ -34,6 +34,5 @@ typedef struct _Placemark
 } Placemark;
 
 void kml_load();
-void kml_parse(char *file);
 void kml_free();
 void kml_display(SDL_Surface *dst, float x, float y, int z);

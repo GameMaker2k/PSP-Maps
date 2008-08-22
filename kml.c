@@ -133,10 +133,13 @@ void kml_load()
 
 void kml_free()
 {
-	/*
-	 * TODO ...
-	 * ... but who cares ;)
-	 */
+	Placemark *tmp = places;
+	while (places)
+	{
+		tmp = places->next;
+		free(places);
+		places = tmp;
+	}
 }
 
 void kml_display(SDL_Surface *dst, float x, float y, int z)
