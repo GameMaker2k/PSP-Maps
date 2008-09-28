@@ -77,6 +77,7 @@ SDL_Joystick *joystick;
 TTF_Font *font;
 CURL *curl;
 char response[BUFFER_SIZE];
+int motion_loaded;
 
 /* x, y, z are in Google's format: z = [ -4 .. 16 ], x and y = [ 1 .. 2^(17-z) ] */
 int z = 16, s = 0;
@@ -1196,7 +1197,7 @@ void loop()
 		dy *= JOYSTICK_STEP / (32768 - JOYSTICK_DEAD);
 		
 		#ifdef _PSP_FW_VERSION
-		if (motionExists())
+		if (motion_loaded && motionExists())
 		{
 			motionAccelData accel;
 			motionGetAccel(&accel);
@@ -1234,7 +1235,7 @@ int main(int argc, char *argv[])
 {
 	#ifdef _PSP_FW_VERSION
 	pspDebugScreenInit();
-	motionLoad();
+	motion_loaded = motionLoad() >= 0;
 	sceUtilityLoadNetModule(PSP_NET_MODULE_COMMON);
 	sceUtilityLoadNetModule(PSP_NET_MODULE_INET);
 	netInit();
