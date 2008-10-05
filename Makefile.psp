@@ -1,5 +1,5 @@
 TARGET = PSP-Maps
-OBJS = pspmaps.o global.o kml.o
+OBJS = pspmaps.o global.o kml.o sceUsbGps.o
 
 PSP_FW_VERSION = 371
 BUILD_PRX = 1
@@ -25,6 +25,6 @@ LIBS = -lmotion_driver -lc -lSDL_image -lSDL_gfx -lSDL_ttf -lSDL_mixer -lpng -lj
 LIBS += $(shell $(PSPBIN)/sdl-config --libs)
 LIBS += $(shell $(PSPBIN)/curl-config --libs)
 LIBS += $(shell $(PSPBIN)/xml2-config --libs)
-LIBS += -lpspwlan -lpsputility -lpspgum -lpspgu -lm
+LIBS += -lpspwlan -lpsputility -lpspgum -lpspgu -lpspusb -lm
 
 include $(PSPSDK)/lib/build.mak

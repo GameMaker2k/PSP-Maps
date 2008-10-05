@@ -64,6 +64,10 @@ void quit();
 #define DANZEFF_SDL
 #include "pspctrl_emu.c"
 #include "danzeff.c"
+#include <pspusb.h>
+#include <pspusbacc.h>
+#include "pspusbgps.h"
+#define PSP_USBGPS_DRIVERNAME "USBGps_Driver"
 #endif
 
 #ifdef _WIN32
@@ -77,7 +81,7 @@ SDL_Joystick *joystick;
 TTF_Font *font;
 CURL *curl;
 char response[BUFFER_SIZE];
-int motion_loaded;
+int motion_loaded, gps_loaded;
 
 /* x, y, z are in Google's format: z = [ -4 .. 16 ], x and y = [ 1 .. 2^(17-z) ] */
 int z = 16, s = 0;
@@ -1220,6 +1224,22 @@ void loop()
 				display(FX_OUT);
 			}
 		}
+		
+		if (gps_loaded)
+		{
+			gpsdata gpsd;
+			satdata satd;
+			bzero(&gpsd, sizeof(gpsd));
+			bzero(&satd, sizeof(satd));
+			sceUsbGpsGetData(&gpsd, &satd);
+			if (gpsd.latitude != 0 || gpsd.longitude != 0)
+			{
+				latlon2xy(gpsd.latitude, gpsd.longitude, &x, &y, z);
+				dx = 0;
+				dy = 0;
+				display(FX_NONE);
+			}
+		}
 		#endif
 		
 		x += dx;
@@ -1231,11 +1251,33 @@ void loop()
 	}
 }
 
+#ifdef _PSP_FW_VERSION
+int gpsLoad()
+{
+	if (sceUtilityLoadUsbModule(PSP_USB_MODULE_ACC))
+		return -1;
+	if (sceUtilityLoadUsbModule(PSP_USB_MODULE_GPS))
+		return -2;
+	if (sceUsbStart(PSP_USBBUS_DRIVERNAME, 0, 0))
+		return -3;
+	if (sceUsbStart(PSP_USBACC_DRIVERNAME, 0, 0))
+		return -4;	
+	if (sceUsbStart(PSP_USBGPS_DRIVERNAME, 0, 0))
+		return -5;
+	if (sceUsbGpsOpen())
+		return -6;
+	if (sceUsbActivate(PSP_USBGPS_PID))
+		return -7;
+	return 0;
+}
+#endif
+
 int main(int argc, char *argv[])
 {
 	#ifdef _PSP_FW_VERSION
 	pspDebugScreenInit();
 	motion_loaded = motionLoad() >= 0;
+	gps_loaded = gpsLoad() >= 0;
 	sceUtilityLoadNetModule(PSP_NET_MODULE_COMMON);
 	sceUtilityLoadNetModule(PSP_NET_MODULE_INET);
 	netInit();
