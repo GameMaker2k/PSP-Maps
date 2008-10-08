@@ -119,6 +119,7 @@ struct
 	int danzeff;
 	int show_kml;
 	int cheat;
+	int follow_gps;
 } config;
 
 /* user's favorite places */
@@ -246,6 +247,7 @@ enum
 	MENU_DEFAULT,
 	MENU_INFO,
 	MENU_KML,
+	MENU_GPS,
 	MENU_EFFECT,
 	MENU_KEYBOARD,
 	MENU_RADIUS,
@@ -658,6 +660,7 @@ void menu()
 		ENTRY(MENU_DEFAULT, "Default view");
 		ENTRY(MENU_INFO, "Show informations: %s", config.show_info ? "Yes" : "No");
 		ENTRY(MENU_KML, "Show KML data: %s", config.show_kml ? "Yes" : "No");
+		ENTRY(MENU_GPS, "Center map on GPS: %s", config.follow_gps ? "Yes" : "No");
 		ENTRY(MENU_EFFECT, "Transition effects: %s", config.use_effects ? "Yes" : "No");
 		ENTRY(MENU_KEYBOARD, "Keyboard type: %s", config.danzeff ? "Danzeff" : "Arcade");
 		ENTRY(MENU_RADIUS, "Cache neighborhood radius: %d", radius);
@@ -742,6 +745,10 @@ void menu()
 								case MENU_KML:
 									config.show_kml = !config.show_kml;
 									break;
+								/* GPS */
+								case MENU_GPS:
+									config.follow_gps = !config.follow_gps;
+									break;
 								/* effects */
 								case MENU_EFFECT:
 									config.use_effects = !config.use_effects;
@@ -774,7 +781,7 @@ void menu()
 										SDL_Flip(screen);
 									}
 									break;
-								/* keyboard */
+								/* cheat */
 								case MENU_CHEAT:
 									config.cheat = !config.cheat;
 									s = 0;
@@ -841,6 +848,10 @@ void menu()
 								case MENU_KML:
 									config.show_kml = !config.show_kml;
 									break;
+								/* GPS */
+								case MENU_GPS:
+									config.follow_gps = !config.follow_gps;
+									break;
 								/* effects */
 								case MENU_EFFECT:
 									config.use_effects = !config.use_effects;
@@ -854,7 +865,7 @@ void menu()
 									radius--;
 									if (radius < 1) radius = MAX_RADIUS;
 									break;
-								/* keyboard */
+								/* cheat */
 								case MENU_CHEAT:
 									config.cheat = !config.cheat;
 									s = 0;
@@ -893,6 +904,10 @@ void menu()
 								case MENU_KML:
 									config.show_kml = !config.show_kml;
 									break;
+								/* GPS */
+								case MENU_GPS:
+									config.follow_gps = !config.follow_gps;
+									break;
 								/* effects */
 								case MENU_EFFECT:
 									config.use_effects = !config.use_effects;
@@ -906,7 +921,7 @@ void menu()
 									radius++;
 									if (radius > MAX_RADIUS) radius = 1;
 									break;
-								/* keyboard */
+								/* cheat */
 								case MENU_CHEAT:
 									config.cheat = !config.cheat;
 									s = 0;
@@ -961,6 +976,7 @@ void init()
 	config.show_kml = 0;
 	config.danzeff = 1;
 	config.cheat = 0;
+	config.follow_gps = 1;
 	
 	/* load configuration if available */
 	if ((f = fopen("data/config.dat", "rb")) != NULL)
@@ -1192,7 +1208,7 @@ void loop()
 			}
 		}
 		
-		if (gps_loaded)
+		if (gps_loaded && config.follow_gps)
 		{
 			gpsdata gpsd;
 			satdata satd;
