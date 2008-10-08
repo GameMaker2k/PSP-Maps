@@ -636,8 +636,8 @@ void menu()
 	#define MENU_LEFT 140
 	#endif
 	
-	#define MENU_TOP 65
-	#define MENU_BOTTOM 30
+	#define MENU_TOP 60
+	#define MENU_BOTTOM 10
 	#define MENU_Y (HEIGHT - MENU_TOP - MENU_BOTTOM) / MENU_NUM
 	#define MAX_RADIUS 25
 	#define ENTRY(position, format...) sprintf(temp, format); print(next, MENU_LEFT, MENU_TOP + position * MENU_Y, temp);
@@ -647,10 +647,11 @@ void menu()
 		char temp[50];
 		SDL_Rect pos;
 		SDL_FillRect(next, NULL, BLACK);
-		pos.x = MENU_LEFT-60;
+		pos.x = MENU_LEFT-80;
 		pos.y = 0;
 		SDL_BlitSurface(logo, NULL, next, &pos);
-		print(next, MENU_LEFT+140, 30, "version " VERSION);
+		print(next, MENU_LEFT+120, 20, "version " VERSION);
+		print(next, MENU_LEFT+120, 35, "http://royale.zerezo.com/psp/");
 		print(next, MENU_LEFT-20, MENU_TOP + active * MENU_Y, ">");
 		ENTRY(MENU_VIEW, "Current view: %s", _view[s]);
 		ENTRY(MENU_ADDRESS, "Enter address...");
@@ -668,7 +669,6 @@ void menu()
 		ENTRY(MENU_CACHE, "Cache size: %d (~ %d MB)", cache_size, cache_size * 20 / 1000);
 		ENTRY(MENU_EXIT, "Exit menu");
 		ENTRY(MENU_QUIT, "Quit PSP-Maps");
-		print(next, MENU_LEFT-20, HEIGHT-20, "http://royale.zerezo.com/psp/");
 		SDL_BlitSurface(next, NULL, screen, NULL);
 		SDL_Flip(screen);
 	}
