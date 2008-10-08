@@ -56,3 +56,8 @@ Motion Kit:
 	* Since version 1.3 you can use the PSP Motion Kit with PSP-Maps.
 	* Tilting the PSP will allow you to move on the map.
 	* Moving the PSP quickly up or down will allow you to zoom.
+
+GPS support:
+	* Since version 2.0 you can use the PSP-290 GPS with PSP-Maps.
+	* As soon as the GPS gets a signal, it will try to center the map on the current position.
+	* You can disable this behavior in the menu if you want to manually move on the map again.
