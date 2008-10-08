@@ -88,9 +88,6 @@ int z = 16, s = 0;
 float x = 1, y = 1, dx, dy;
 int active = 0, fav = 0, balancing = 0, radius = 5;
 
-/* cheat mode */
-int cheat = 0;
-
 /* cache in memory, for recent history and smooth moves */
 struct
 {
@@ -121,6 +118,7 @@ struct
 	int show_info;
 	int danzeff;
 	int show_kml;
+	int cheat;
 } config;
 
 /* user's favorite places */
@@ -252,6 +250,7 @@ enum
 	MENU_KEYBOARD,
 	MENU_RADIUS,
 	MENU_CACHE,
+	MENU_CHEAT,
 	MENU_EXIT,
 	MENU_QUIT,
 	MENU_NUM
@@ -662,6 +661,7 @@ void menu()
 		ENTRY(MENU_EFFECT, "Transition effects: %s", config.use_effects ? "Yes" : "No");
 		ENTRY(MENU_KEYBOARD, "Keyboard type: %s", config.danzeff ? "Danzeff" : "Arcade");
 		ENTRY(MENU_RADIUS, "Cache neighborhood radius: %d", radius);
+		ENTRY(MENU_CHEAT, "Switch to sky/moon/mars: %s", config.cheat ? "Yes" : "No");
 		ENTRY(MENU_CACHE, "Cache size: %d (~ %d MB)", cache_size, cache_size * 20 / 1000);
 		ENTRY(MENU_EXIT, "Exit menu");
 		ENTRY(MENU_QUIT, "Quit PSP-Maps");
@@ -774,6 +774,12 @@ void menu()
 										SDL_Flip(screen);
 									}
 									break;
+								/* keyboard */
+								case MENU_CHEAT:
+									config.cheat = !config.cheat;
+									s = 0;
+									if (config.cheat) s = NORMAL_VIEWS+1;
+									break;
 								/* disk cache */
 								case MENU_CACHE:
 									if (config.cache_size != cache_size)
@@ -819,7 +825,7 @@ void menu()
 								/* view */
 								case MENU_VIEW:
 									s--;
-									if (s < (cheat?NORMAL_VIEWS+1:0)) s = (cheat?CHEAT_VIEWS:NORMAL_VIEWS)-1;
+									if (s < (config.cheat?NORMAL_VIEWS+1:0)) s = (config.cheat?CHEAT_VIEWS:NORMAL_VIEWS)-1;
 									break;
 								/* favorites */
 								case MENU_LOAD:
@@ -848,6 +854,12 @@ void menu()
 									radius--;
 									if (radius < 1) radius = MAX_RADIUS;
 									break;
+								/* keyboard */
+								case MENU_CHEAT:
+									config.cheat = !config.cheat;
+									s = 0;
+									if (config.cheat) s = NORMAL_VIEWS+1;
+									break;
 								/* disk cache */
 								case MENU_CACHE:
 									cache_size /= 2;
@@ -865,7 +877,7 @@ void menu()
 								/* view */
 								case MENU_VIEW:
 									s++;
-									if (s > (cheat?CHEAT_VIEWS:NORMAL_VIEWS)-1) s = (cheat?NORMAL_VIEWS+1:0);
+									if (s > (config.cheat?CHEAT_VIEWS:NORMAL_VIEWS)-1) s = (config.cheat?NORMAL_VIEWS+1:0);
 									break;
 								/* favorites */
 								case MENU_LOAD:
@@ -893,6 +905,12 @@ void menu()
 								case MENU_RADIUS:
 									radius++;
 									if (radius > MAX_RADIUS) radius = 1;
+									break;
+								/* keyboard */
+								case MENU_CHEAT:
+									config.cheat = !config.cheat;
+									s = 0;
+									if (config.cheat) s = NORMAL_VIEWS+1;
 									break;
 								/* disk cache */
 								case MENU_CACHE:
@@ -942,6 +960,7 @@ void init()
 	config.show_info = 0;
 	config.show_kml = 0;
 	config.danzeff = 1;
+	config.cheat = 0;
 	
 	/* load configuration if available */
 	if ((f = fopen("data/config.dat", "rb")) != NULL)
@@ -949,6 +968,9 @@ void init()
 		fread(&config, sizeof(config), 1, f);
 		fclose(f);
 	}
+	
+	/* switch to sky if needed */
+	if (config.cheat) s = NORMAL_VIEWS+1;
 	
 	/* allocate disk cache */
 	disk = malloc(sizeof(struct _disk) * config.cache_size);
@@ -1111,13 +1133,13 @@ void loop()
 						case SDLK_F2:
 						case PSP_BUTTON_Y:
 							s--;
-							if (s < (cheat?NORMAL_VIEWS+1:0)) s = (cheat?CHEAT_VIEWS:NORMAL_VIEWS)-1;
+							if (s < (config.cheat?NORMAL_VIEWS+1:0)) s = (config.cheat?CHEAT_VIEWS:NORMAL_VIEWS)-1;
 							display(FX_FADE);
 							break;
 						case SDLK_F3:
 						case PSP_BUTTON_B:
 							s++;
-							if (s > (cheat?CHEAT_VIEWS:NORMAL_VIEWS)-1) s = (cheat?NORMAL_VIEWS+1:0);
+							if (s > (config.cheat?CHEAT_VIEWS:NORMAL_VIEWS)-1) s = (config.cheat?NORMAL_VIEWS+1:0);
 							display(FX_FADE);
 							break;
 						case SDLK_F4:
