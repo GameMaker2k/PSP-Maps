@@ -81,7 +81,7 @@ SDL_Joystick *joystick;
 TTF_Font *font;
 CURL *curl;
 char response[BUFFER_SIZE];
-int motion_loaded, gps_loaded;
+int motion_loaded, gps_loaded, dat_loaded = 0;
 
 /* x, y, z are in Google's format: z = [ -4 .. 16 ], x and y = [ 1 .. 2^(17-z) ] */
 int z = 16, s = 0;
@@ -263,26 +263,30 @@ void quit()
 {
 	FILE *f;
 	
-	/* save disk cache */
-	if ((f = fopen("data/disk.dat", "wb")) != NULL)
+	/* do not save .dat files if there were not loaded! */
+	if (dat_loaded)
 	{
-		fwrite(&disk_idx, sizeof(disk_idx), 1, f);
-		fwrite(disk, sizeof(struct _disk), config.cache_size, f);
-		fclose(f);
-	}
-	
-	/* save configuration */
-	if ((f = fopen("data/config.dat", "wb")) != NULL)
-	{
-		fwrite(&config, sizeof(config), 1, f);
-		fclose(f);
-	}
-	
-	/* save favorites */
-	if ((f = fopen("data/favorite.dat", "wb")) != NULL)
-	{
-		fwrite(favorite, sizeof(favorite), 1, f);
-		fclose(f);
+		/* save disk cache */
+		if ((f = fopen("data/disk.dat", "wb")) != NULL)
+		{
+			fwrite(&disk_idx, sizeof(disk_idx), 1, f);
+			fwrite(disk, sizeof(struct _disk), config.cache_size, f);
+			fclose(f);
+		}
+		
+		/* save configuration */
+		if ((f = fopen("data/config.dat", "wb")) != NULL)
+		{
+			fwrite(&config, sizeof(config), 1, f);
+			fclose(f);
+		}
+		
+		/* save favorites */
+		if ((f = fopen("data/favorite.dat", "wb")) != NULL)
+		{
+			fwrite(favorite, sizeof(favorite), 1, f);
+			fclose(f);
+		}
 	}
 	
 	/* quit SDL and curl */
@@ -1013,6 +1017,9 @@ void init()
 		fread(favorite, sizeof(favorite), 1, f);
 		fclose(f);
 	}
+	
+	/* all .dat where loaded, we can save them on exit */
+	dat_loaded = 1;
 	
 	/* setup curl */
 	curl = curl_easy_init();
