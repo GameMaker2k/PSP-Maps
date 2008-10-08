@@ -1,4 +1,4 @@
-http://mt%d.google.com/mt?n=404&v=w2.80&x=%d&y=%d&zoom=%d
+http://mt%d.google.com/mt?n=404&v=w2.83&x=%d&y=%d&zoom=%d
 http://khm%d.google.com/kh?v=30&t=%s
 http://mt%d.google.com/mt?n=404&v=w2t.80&x=%d&y=%d&zoom=%d
 http://mt%d.google.com/mt?n=404&v=w2p.81&x=%d&y=%d&zoom=%d
