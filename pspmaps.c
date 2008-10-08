@@ -930,10 +930,7 @@ void init()
 {
 	int flags;
 	FILE *f;
-	int i, action, cur = 0;
-	int joy_seq[] = { PSP_BUTTON_DOWN, PSP_BUTTON_R, PSP_BUTTON_UP, PSP_BUTTON_L, PSP_BUTTON_Y, PSP_BUTTON_B, -1 };
-	int key_seq[] = { SDLK_DOWN, SDLK_r, SDLK_UP, SDLK_l, SDLK_y, SDLK_b, -1 };
-	SDL_Event event;
+	int i;
 	char buffer[1024];
 	
 	/* clear memory cache */
@@ -1028,58 +1025,6 @@ void init()
 	#endif
 	if (screen == NULL)
 		quit();
-	
-	/* splash screen */
-	logo = IMG_Load("data/neoflash.png");
-	SDL_BlitSurface(logo, NULL, next, NULL);
-	SDL_FreeSurface(logo);
-	
-	/* splash sound */
-	Mix_Chunk *capcom = Mix_LoadWAV("data/capcom.wav");
-	Mix_Chunk *yo = Mix_LoadWAV("data/yo.wav");
-	int channel = Mix_PlayChannel(-1, capcom, 0);
-	i = 0;
-	SDL_Surface *tmp;
-	
-	/* handle cheat code */
-	while (Mix_Playing(channel))
-	{
-		while (SDL_PollEvent(&event))
-		{
-			switch (event.type)
-			{
-				case SDL_JOYBUTTONDOWN:
-				case SDL_KEYDOWN:
-					if (event.type == SDL_KEYDOWN)
-						action = event.key.keysym.sym;
-					else
-						action = event.jbutton.button;
-					if (action == joy_seq[cur] || action == key_seq[cur])
-					{
-						cur++;
-						if (joy_seq[cur] == -1 || key_seq[cur] == -1)
-						{
-							Mix_PlayChannel(-1, yo, 0);
-							cheat = 1;
-						}
-					}
-					else cur = 0;
-					break;
-			}
-		}
-		i++;
-		tmp = zoomSurface(next, 1, 1, 0);
-		SDL_SetAlpha(tmp, SDL_SRCALPHA, i);
-		SDL_BlitSurface(tmp, NULL, screen, NULL);
-		SDL_FreeSurface(tmp);
-		SDL_Flip(screen);
-		#if ! ( _PSP_FW_VERSION || GP2X )
-		SDL_Delay(50);
-		#endif
-	}
-	if (cheat) s = NORMAL_VIEWS+1;
-	Mix_FreeChunk(capcom);
-	Mix_FreeChunk(yo);
 	
 	/* load textures */
 	logo = IMG_Load("data/logo.png");
