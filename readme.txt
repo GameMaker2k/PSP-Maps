@@ -32,7 +32,8 @@ PC version:
 	* It can also be used to prepare a large cache (PC is faster than PSP).
 	* You will have exactly the same display as the PSP.
 	* Arrows to move, page up/down to zoom, F1/F2/F3/F4 for buttons, escape for menu.
-	* Copy the data/ folder to your PSP.
+	* Copy the cache/ and data/ folders to your PSP.
+	* An easier way is to connect the PSP to the PC, browse to the PSP-Maps folder, and launch pspmaps.exe directly from there.
 
 GP2X version:
 	* You will have to build a map cache on the PC before.
@@ -56,6 +57,7 @@ Motion Kit:
 	* Since version 1.3 you can use the PSP Motion Kit with PSP-Maps.
 	* Tilting the PSP will allow you to move on the map.
 	* Moving the PSP quickly up or down will allow you to zoom.
+	* If you experience errors starting PSP-Maps, you can try to remove the motion_driver.prx file.
 
 GPS support:
 	* Since version 2.0 you can use the PSP-290 GPS with PSP-Maps.
