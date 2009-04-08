@@ -1,6 +1,6 @@
-http://mt%d.google.com/mt?v=w2.89&x=%d&y=%d&zoom=%d
-http://khm%d.google.com/kh?v=34&t=%s
-http://mt%d.google.com/mt?v=w2t.88&x=%d&y=%d&zoom=%d
+http://mt%d.google.com/mt?v=w2.92&x=%d&y=%d&zoom=%d
+http://khm%d.google.com/kh?v=37&t=%s
+http://mt%d.google.com/mt?v=w2t.92&x=%d&y=%d&zoom=%d
 http://mt%d.google.com/mt?v=w2p.87&x=%d&y=%d&zoom=%d
 http://tiles.virtualearth.net/tiles/r%s?g=117
 http://tiles.virtualearth.net/tiles/a%s?g=117
