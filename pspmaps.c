@@ -84,7 +84,7 @@ char response[BUFFER_SIZE];
 int motion_loaded, gps_loaded, dat_loaded = 0;
 
 /* x, y, z are in Google's format: z = [ -4 .. 16 ], x and y = [ 1 .. 2^(17-z) ] */
-int z = 16, s = 0;
+int z = 16, s = 4;
 float x = 1, y = 1, dx, dy;
 int active = 0, fav = 0, balancing = 0, radius = 5;
 
