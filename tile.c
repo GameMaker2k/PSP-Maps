@@ -186,7 +186,10 @@ SDL_RWops *getnet(int x, int y, int z, int s)
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, rw);
 	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10);
-	curl_easy_perform(curl);
+	
+	if (curl_easy_perform(curl) != 0)
+		/* if there was a network error, invalidate previous buffer */
+		response[0] = '\0';
 	
 	return rw;
 }
@@ -231,8 +234,6 @@ SDL_Surface* gettile(int x, int y, int z, int s)
 	/* try disk cache */
 	if ((tile = getdisk(x, y, z, s)) != NULL)
 	{
-		if (tile == NULL)
-			tile = zoomSurface(na, 1, 1, 0);
 		savememory(x, y, z, s, tile);
 		return tile;
 	}
