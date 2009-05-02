@@ -155,6 +155,10 @@ SDL_RWops *getnet(int x, int y, int z, int s)
 		case YH_HYBRID:
 			sprintf(request, _url[s], x, (int) pow(2, 16-z)-y-1, z+1);
 			break;
+		case OS_MAPNIK:
+		case OS_OSMARENDER:
+			sprintf(request, _url[s], 17-z, x, y);
+			break;
 		case GG_MOON_APOLLO:
 		case GG_MOON_ELEVATION:
 			sprintf(request, _url[s], 17-z, x, (int) pow(2, 17-z)-y-1);
