@@ -181,7 +181,7 @@ SDL_RWops *getnet(int x, int y, int z, int s)
 	rw = SDL_RWFromMem(response, BUFFER_SIZE);
 	
 	//curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
-	curl_easy_setopt(curl, CURLOPT_USERAGENT, "Mozilla/5.0");
+	curl_easy_setopt(curl, CURLOPT_USERAGENT, "PSP-Maps " VERSION);
 	curl_easy_setopt(curl, CURLOPT_URL, request);
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, rw);
