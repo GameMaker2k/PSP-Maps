@@ -2,7 +2,7 @@ PSP-Maps
 http://royale.zerezo.com/psp/
 
 Install:
-	* Copy PSP-Maps folder to your PSP/GAME3xx folder.
+	* Copy PSP-Maps folder to your PSP/GAMExxx folder.
 	* For custom firmwares 3.90, please also try PSP/GAME380 folder.
 
 Controls:

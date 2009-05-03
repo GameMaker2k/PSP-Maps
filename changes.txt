@@ -1,5 +1,10 @@
 Change log file for PSP-Maps
 
+version 2.1	(2009-05-03)
+	* changed the default view to Virtual Earth
+	* added OpenStreetMap support
+	* fixed network errors that could corrupt cache
+
 version 2.0	(2008-10-08)
 	* added basic PSP-290 GPS support
 	* removed the spash screen
