@@ -86,7 +86,7 @@ int motion_loaded, gps_loaded, dat_loaded = 0;
 /* x, y, z are in Google's format: z = [ -4 .. 16 ], x and y = [ 1 .. 2^(17-z) ] */
 int z = 16, s = 4;
 float x = 1, y = 1, dx, dy;
-int active = 0, fav = 0, balancing = 0, radius = 5;
+int active = 0, fav = 0, balancing = 0, cache_zoom = 3;
 
 /* cache in memory, for recent history and smooth moves */
 struct
@@ -254,8 +254,8 @@ enum
 	MENU_GPS,
 	MENU_EFFECT,
 	MENU_KEYBOARD,
-	MENU_RADIUS,
-	MENU_CACHE,
+	MENU_CACHEZOOM,
+	MENU_CACHESIZE,
 	MENU_CHEAT,
 	MENU_EXIT,
 	MENU_QUIT,
@@ -636,7 +636,7 @@ void menu()
 {
 	SDL_Event event;
 	int action, cache_size = config.cache_size;
-	int i, j;
+	int i, j, k;
 	
 	#ifdef GP2X
 	#define MENU_LEFT 80
@@ -647,7 +647,7 @@ void menu()
 	#define MENU_TOP 60
 	#define MENU_BOTTOM 10
 	#define MENU_Y (HEIGHT - MENU_TOP - MENU_BOTTOM) / MENU_NUM
-	#define MAX_RADIUS 25
+	#define MAX_CACHEZOOM 9
 	#define ENTRY(position, format...) sprintf(temp, format); print(next, MENU_LEFT, MENU_TOP + position * MENU_Y, temp);
 	
 	void update()
@@ -672,9 +672,9 @@ void menu()
 		ENTRY(MENU_GPS, "Center map on GPS: %s", config.follow_gps ? "Yes" : "No");
 		ENTRY(MENU_EFFECT, "Transition effects: %s", config.use_effects ? "Yes" : "No");
 		ENTRY(MENU_KEYBOARD, "Keyboard type: %s", config.danzeff ? "Danzeff" : "Arcade");
-		ENTRY(MENU_RADIUS, "Cache neighborhood radius: %d", radius);
+		ENTRY(MENU_CACHEZOOM, "Cache zoom levels: %d", cache_zoom);
 		ENTRY(MENU_CHEAT, "Switch to sky/moon/mars: %s", config.cheat ? "Yes" : "No");
-		ENTRY(MENU_CACHE, "Cache size: %d (~ %d MB)", cache_size, cache_size * 20 / 1000);
+		ENTRY(MENU_CACHESIZE, "Cache size: %d (~ %d MB)", cache_size, cache_size * 20 / 1000);
 		ENTRY(MENU_EXIT, "Exit menu");
 		ENTRY(MENU_QUIT, "Quit PSP-Maps");
 		SDL_BlitSurface(next, NULL, screen, NULL);
@@ -765,28 +765,36 @@ void menu()
 								case MENU_KEYBOARD:
 									config.danzeff = !config.danzeff;
 									break;
-								/* radius */
-								case MENU_RADIUS:
+								/* zoom cache */
+								case MENU_CACHEZOOM:
 									box(next, WIDTH/2, HEIGHT/2, 400, 70, 200);
-									print(next, 50, HEIGHT/2 - 30, "Loading neighborhood to cache...");
-									for (i = 0; i <= 2*radius; i++)
-									for (j = 0; j <= 2*radius; j++)
+									print(next, 50, HEIGHT/2 - 30, "Loading zoom levels to cache...");
+									int total = 0, done = 0;
+									float xx = x, yy = y;
+									for (k = 1; k <= cache_zoom; k++) total += pow(4, k+1);
+									for (k = 1; k <= cache_zoom; k++)
 									{
-										float ratio = 1.0 * (i*(2*radius+1)+j+1)/(2*radius+1)/(2*radius+1);
-										boxRGBA(next, WIDTH/2 - 180, HEIGHT/2, WIDTH/2 - 180 + 360.0 * ratio, HEIGHT/2 + 15, 255, 0, 0, 255);
-										/* special process for hybrid maps: get 2 images */
-										switch (s)
+										xx *= 2;
+										yy *= 2;
+										for (j = yy-pow(2, k); j < yy+pow(2, k); j++)
+										for (i = xx-pow(2, k); i < xx+pow(2, k); i++)
 										{
-											case GG_HYBRID:
-												gettile(x-radius+i, y-radius+j, z, GG_SATELLITE);
-												break;
-											case YH_HYBRID:
-												gettile(x-radius+i, y-radius+j, z, YH_SATELLITE);
-												break;
+											float ratio = 1.0 * ++done / total;
+											boxRGBA(next, WIDTH/2 - 180, HEIGHT/2, WIDTH/2 - 180 + 360.0 * ratio, HEIGHT/2 + 15, 255, 0, 0, 255);
+											/* special process for hybrid maps: get 2 images */
+											switch (s)
+											{
+												case GG_HYBRID:
+													gettile(i, j, z-k, GG_SATELLITE);
+													break;
+												case YH_HYBRID:
+													gettile(i, j, z-k, YH_SATELLITE);
+													break;
+											}
+											gettile(i, j, z-k, s);
+											SDL_BlitSurface(next, NULL, screen, NULL);
+											SDL_Flip(screen);
 										}
-										gettile(x-radius+i, y-radius+j, z, s);
-										SDL_BlitSurface(next, NULL, screen, NULL);
-										SDL_Flip(screen);
 									}
 									break;
 								/* cheat */
@@ -796,7 +804,7 @@ void menu()
 									if (config.cheat) s = NORMAL_VIEWS+1;
 									break;
 								/* disk cache */
-								case MENU_CACHE:
+								case MENU_CACHESIZE:
 									if (config.cache_size != cache_size)
 									{
 										int old;
@@ -868,10 +876,10 @@ void menu()
 								case MENU_KEYBOARD:
 									config.danzeff = !config.danzeff;
 									break;
-								/* radius */
-								case MENU_RADIUS:
-									radius--;
-									if (radius < 1) radius = MAX_RADIUS;
+								/* zoom cache */
+								case MENU_CACHEZOOM:
+									cache_zoom--;
+									if (cache_zoom < 1) cache_zoom = MAX_CACHEZOOM;
 									break;
 								/* cheat */
 								case MENU_CHEAT:
@@ -880,7 +888,7 @@ void menu()
 									if (config.cheat) s = NORMAL_VIEWS+1;
 									break;
 								/* disk cache */
-								case MENU_CACHE:
+								case MENU_CACHESIZE:
 									cache_size /= 2;
 									if (cache_size == 0) cache_size = 409600;
 									if (cache_size < 100) cache_size = 0;
@@ -924,10 +932,10 @@ void menu()
 								case MENU_KEYBOARD:
 									config.danzeff = !config.danzeff;
 									break;
-								/* radius */
-								case MENU_RADIUS:
-									radius++;
-									if (radius > MAX_RADIUS) radius = 1;
+								/* zoom cache */
+								case MENU_CACHEZOOM:
+									cache_zoom++;
+									if (cache_zoom > MAX_CACHEZOOM) cache_zoom = 1;
 									break;
 								/* cheat */
 								case MENU_CHEAT:
@@ -936,7 +944,7 @@ void menu()
 									if (config.cheat) s = NORMAL_VIEWS+1;
 									break;
 								/* disk cache */
-								case MENU_CACHE:
+								case MENU_CACHESIZE:
 									cache_size *= 2;
 									if (cache_size == 0) cache_size = 100;
 									if (cache_size > 409600) cache_size = 0;
