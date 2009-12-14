@@ -648,6 +648,7 @@ void menu()
 	#define MENU_BOTTOM 10
 	#define MENU_Y (HEIGHT - MENU_TOP - MENU_BOTTOM) / MENU_NUM
 	#define MAX_CACHEZOOM 9
+	#define MAX_CACHESIZE 32 * 1024 * 100
 	#define ENTRY(position, format...) sprintf(temp, format); print(next, MENU_LEFT, MENU_TOP + position * MENU_Y, temp);
 	
 	void update()
@@ -890,7 +891,7 @@ void menu()
 								/* disk cache */
 								case MENU_CACHESIZE:
 									cache_size /= 2;
-									if (cache_size == 0) cache_size = 409600;
+									if (cache_size == 0) cache_size = MAX_CACHESIZE;
 									if (cache_size < 100) cache_size = 0;
 									break;
 							}
@@ -947,7 +948,7 @@ void menu()
 								case MENU_CACHESIZE:
 									cache_size *= 2;
 									if (cache_size == 0) cache_size = 100;
-									if (cache_size > 409600) cache_size = 0;
+									if (cache_size > MAX_CACHESIZE) cache_size = 0;
 									break;
 							}
 							update();
