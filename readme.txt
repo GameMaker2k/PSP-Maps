@@ -25,7 +25,7 @@ Offline browsing:
 Caching:
 	* You can adjust the size of your cache in the menu (you must validate to confirm).
 	* The bigger is the better, but it will use some space on your memory stick.
-	* The "cache neighborhood" option is helpful to download a big map to your cache.
+	* The "cache zoom levels" option is helpful to download a big map to your cache.
 
 PC version:
 	* If you don't have WiFi, you can use the PC version to build a compatible cache.

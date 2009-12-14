@@ -1,5 +1,10 @@
 Change log file for PSP-Maps
 
+version 2.2	(2009-12-14)
+	* replaced radius scan with recursive scan
+	* allow bigger disk cache
+	* updated urls.txt for Google Maps
+
 version 2.1	(2009-05-03)
 	* changed the default view to Virtual Earth
 	* added OpenStreetMap support
