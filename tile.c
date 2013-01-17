@@ -138,7 +138,7 @@ SDL_RWops *getnet(int x, int y, int z, int s)
 			sprintf(request, _url[s], ++balancing%4, x, y, z);
 			break;
 		case GG_SATELLITE:
-			sprintf(request, _url[s], ++balancing%4, GGtile(x, y, z));
+			sprintf(request, _url[s], ++balancing%4, x, y, z);
 			break;
 		case GG_HYBRID:
 		case GG_TERRAIN:

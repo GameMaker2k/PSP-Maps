@@ -1,7 +1,7 @@
 http://mt%d.google.com/vt/lyrs=m&x=%d&y=%d&zoom=%d
-http://khm%d.google.com/kh/v=80&t=%s
+http://khm%d.google.com/kh/v=123&x=%d&y=%d&zoom=%d
 http://mt%d.google.com/vt/lyrs=h&x=%d&y=%d&zoom=%d
-http://mt%d.google.com/vt/v=w2p.115&x=%d&y=%d&zoom=%d
+http://mt%d.google.com/vt/lyrs=t&x=%d&y=%d&zoom=%d
 http://tiles.virtualearth.net/tiles/r%s?g=117
 http://tiles.virtualearth.net/tiles/a%s?g=117
 http://tiles.virtualearth.net/tiles/h%s?g=117
