@@ -1,9 +1,5 @@
-CC ?= gcc
-CFLAGS += -O2 -g
-SDLCONFIG = sdl-config
-CURLCONFIG = curl-config
-XMLCONFIG = xml2-config
-LIBS = -lSDL_image -lSDL_gfx -lSDL_ttf -lSDL_mixer
+CFLAGS += -O2 -g -Wall `sdl-config --cflags` `curl-config --cflags` `xml2-config --cflags`
+LIBS = -lSDL_image -lSDL_gfx -lSDL_ttf -lSDL_mixer `sdl-config --libs` `curl-config --libs` `xml2-config --libs`
 PREFIX ?= /usr/local
 DESTDIR ?= 
 
@@ -12,13 +8,13 @@ DESTDIR ?=
 all: pspmaps
 
 pspmaps: pspmaps.c $(ICON) global.o kml.o tile.c io.c
-	$(CC) $(CFLAGS) -o pspmaps$(EXEEXT) pspmaps.c $(ICON) global.o kml.o $(LIBS) `$(CURLCONFIG) --cflags --libs` `$(SDLCONFIG) --cflags --libs` `$(XMLCONFIG) --libs`
+	$(CC) $(CFLAGS) -o pspmaps$(EXEEXT) pspmaps.c $(ICON) global.o kml.o $(LIBS)
 
 global.o: global.c global.h
 	$(CC) $(CFLAGS) -c global.c
 
 kml.o: kml.c kml.h
-	$(CC) $(CFLAGS) -c kml.c `$(SDLCONFIG) --cflags` `$(XMLCONFIG) --cflags`
+	$(CC) $(CFLAGS) -c kml.c
 
 icon.o: icon.rc
 	$(WINDRES) -i icon.rc -o icon.o
