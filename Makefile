@@ -7,7 +7,7 @@ LIBS = -lSDL_image -lSDL_gfx -lSDL_ttf -lSDL_mixer
 PREFIX ?= /usr/local
 DESTDIR ?= 
 
-.PHONY: all install
+.PHONY: all install uninstall clean
 
 all: pspmaps
 
@@ -26,6 +26,9 @@ icon.o: icon.rc
 install: pspmaps
 	install -v -m 0755 -d $(DESTDIR)$(PREFIX)/bin
 	install -v -m 0755 ./pspmaps$(EXT) $(DESTDIR)$(PREFIX)/bin
+
+uninstall: pspmaps
+	rm -rfv $(DESTDIR)$(PREFIX)/bin/pspmaps$(EXT)
 
 clean:
 	rm -rfv pspmaps pspmaps.exe *.o PSP-Maps.prx PSP-Maps.elf PARAM.SFO EBOOT.PBP pspmaps.gpu cache/ data/*.dat kml/
