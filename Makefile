@@ -1,4 +1,5 @@
-CFLAGS = -O2 -g
+CC ?= gcc
+CFLAGS += -O2 -g
 SDLCONFIG = sdl-config
 CURLCONFIG = curl-config
 XMLCONFIG = xml2-config

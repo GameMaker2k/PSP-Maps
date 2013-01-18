@@ -183,7 +183,7 @@ SDL_RWops *getnet(int x, int y, int z, int s)
 			sprintf(request, _url[s], 17-z, x, y);
 			break;
 	}
-	
+	printf("URL(%s)\n", request);
 	rw = SDL_RWFromMem(response, BUFFER_SIZE);
 	
 	//curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
