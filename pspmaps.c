@@ -145,7 +145,8 @@ enum
 	YH_SATELLITE,
 	YH_HYBRID,
 	OS_MAPNIK,
-	OS_OSMARENDER,
+	OS_OPENCYCLEMAP,
+	OS_OPENCYCLEMAPTRANS,
 	NORMAL_VIEWS,
 	GG_MOON_APOLLO,
 	GG_MOON_ELEVATION,
@@ -173,7 +174,8 @@ char *_view[CHEAT_VIEWS] = {
 	"Yahoo! Maps / Satellite",
 	"Yahoo! Maps / Hybrid",
 	"OpenStreetMap / Mapnik",
-	"OpenStreetMap / Osmarender",
+	"OpenCycleMap / Map",
+	"OpenCycleMap / Transport",
 	"",
 	"Google Moon / Apollo",
 	"Google Moon / Elevation",
@@ -701,6 +703,7 @@ void menu()
 					switch (action)
 					{
 						case SDLK_ESCAPE:
+						case SDLK_LALT:
 						case PSP_BUTTON_START:
 							return;
 						case SDLK_SPACE:
@@ -1142,6 +1145,7 @@ void loop()
 							display(FX_DOWN);
 							break;
 						case SDLK_PAGEUP:
+						case SDLK_RCTRL:
 						case PSP_BUTTON_R:
 							if (z > -4)
 							{
@@ -1152,6 +1156,7 @@ void loop()
 							}
 							break;
 						case SDLK_PAGEDOWN:
+						case SDLK_RALT:
 						case PSP_BUTTON_L:
 							if (z < 16)
 							{
@@ -1162,17 +1167,20 @@ void loop()
 							}
 							break;
 						case SDLK_F1:
+						case SDLK_LCTRL:
 						case PSP_BUTTON_X:
 							go();
 							display(FX_FADE);
 							break;
 						case SDLK_F2:
+						case SDLK_HOME:
 						case PSP_BUTTON_Y:
 							s--;
 							if (s < (config.cheat?NORMAL_VIEWS+1:0)) s = (config.cheat?CHEAT_VIEWS:NORMAL_VIEWS)-1;
 							display(FX_FADE);
 							break;
 						case SDLK_F3:
+						case SDLK_END:
 						case PSP_BUTTON_B:
 							s++;
 							if (s > (config.cheat?CHEAT_VIEWS:NORMAL_VIEWS)-1) s = (config.cheat?NORMAL_VIEWS+1:0);
@@ -1184,6 +1192,7 @@ void loop()
 							display(FX_NONE);
 							break;
 						case SDLK_ESCAPE:
+						case SDLK_LALT:
 						case PSP_BUTTON_START:
 							menu();
 							display(FX_FADE);
