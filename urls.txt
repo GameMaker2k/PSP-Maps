@@ -12,6 +12,8 @@ http://us.maps3.yimg.com/aerial.maps.yimg.com/ximg?v=2.5&t=p&x=%d&y=%d&z=%d
 http://tile.openstreetmap.org/%d/%d/%d.png
 http://tile.opencyclemap.org/cycle/%d/%d/%d.png
 http://tile2.opencyclemap.org/transport/%d/%d/%d.png
+http://otile1.mqcdn.com/tiles/1.0.0/osm/%d/%d/%d.jpg
+http://oatile1.mqcdn.com/naip/%d/%d/%d.jpg
 http://mw1.google.com/mw-planetary/lunar/lunarmaps_v1/apollo/%d/%d/%d.jpg
 http://mw1.google.com/mw-planetary/lunar/lunarmaps_v1/terrain/%d/%d/%d.jpg
 http://mw1.google.com/mw-planetary/mars/elevation/%s.jpg
