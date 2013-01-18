@@ -12,7 +12,7 @@ DESTDIR ?=
 all: pspmaps
 
 pspmaps: pspmaps.c $(ICON) global.o kml.o tile.c io.c
-	$(CC) $(CFLAGS) -o pspmaps$(EXT) pspmaps.c $(ICON) global.o kml.o $(LIBS) `$(CURLCONFIG) --cflags --libs` `$(SDLCONFIG) --cflags --libs` `$(XMLCONFIG) --libs`
+	$(CC) $(CFLAGS) -o pspmaps$(EXEEXT) pspmaps.c $(ICON) global.o kml.o $(LIBS) `$(CURLCONFIG) --cflags --libs` `$(SDLCONFIG) --cflags --libs` `$(XMLCONFIG) --libs`
 
 global.o: global.c global.h
 	$(CC) $(CFLAGS) -c global.c
@@ -25,10 +25,10 @@ icon.o: icon.rc
 
 install: pspmaps
 	install -v -m 0755 -d $(DESTDIR)$(PREFIX)/bin
-	install -v -m 0755 ./pspmaps$(EXT) $(DESTDIR)$(PREFIX)/bin
+	install -v -m 0755 ./pspmaps$(EXEEXT) $(DESTDIR)$(PREFIX)/bin
 
 uninstall: pspmaps
-	rm -rfv $(DESTDIR)$(PREFIX)/bin/pspmaps$(EXT)
+	rm -rfv $(DESTDIR)$(PREFIX)/bin/pspmaps$(EXEEXT)
 
 clean:
 	rm -rfv pspmaps pspmaps.exe *.o PSP-Maps.prx PSP-Maps.elf PARAM.SFO EBOOT.PBP pspmaps.gpu cache/ data/*.dat kml/
