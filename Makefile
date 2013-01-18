@@ -1,3 +1,4 @@
+CC ?= gcc
 CFLAGS += -O2 -g -Wall `sdl-config --cflags` `curl-config --cflags` `xml2-config --cflags`
 LIBS = -lSDL_image -lSDL_gfx -lSDL_ttf -lSDL_mixer `sdl-config --libs` `curl-config --libs` `xml2-config --libs`
 PREFIX ?= /usr/local
