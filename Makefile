@@ -1,6 +1,6 @@
 CC ?= gcc
 CFLAGS += -O2 -g -Wall `sdl-config --cflags` `curl-config --cflags` `xml2-config --cflags`
-LIBS = -lSDL_image -lSDL_gfx -lSDL_ttf -lSDL_mixer `sdl-config --libs` `curl-config --libs` `xml2-config --libs`
+LIBS += -lSDL_image -lSDL_gfx -lSDL_ttf -lSDL_mixer `sdl-config --libs` `curl-config --libs` `xml2-config --libs` $(LDFLAGS)
 PREFIX ?= /usr/local
 DESTDIR ?= 
 
@@ -29,3 +29,4 @@ uninstall: pspmaps
 
 clean:
 	rm -rfv pspmaps pspmaps.exe *.o PSP-Maps.prx PSP-Maps.elf PARAM.SFO EBOOT.PBP pspmaps.gpu cache/ data/*.dat kml/
+
