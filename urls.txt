@@ -10,6 +10,7 @@ http://us.maps1.yimg.com/us.tile.yimg.com/tl?v=4.1&x=%d&y=%d&z=%d
 http://us.maps3.yimg.com/aerial.maps.yimg.com/ximg?v=1.7&t=a&x=%d&y=%d&z=%d
 http://us.maps3.yimg.com/aerial.maps.yimg.com/ximg?v=2.5&t=p&x=%d&y=%d&z=%d
 http://tile.openstreetmap.org/%d/%d/%d.png
+http://tile.cloudmade.com/BC9A493B41014CAABB98F0471D759707/1/256/%d/%d/%d.png
 http://tile.opencyclemap.org/cycle/%d/%d/%d.png
 http://tile2.opencyclemap.org/transport/%d/%d/%d.png
 http://otile1.mqcdn.com/tiles/1.0.0/osm/%d/%d/%d.jpg

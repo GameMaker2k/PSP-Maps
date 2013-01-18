@@ -156,6 +156,7 @@ SDL_RWops *getnet(int x, int y, int z, int s)
 			sprintf(request, _url[s], x, (int) pow(2, 16-z)-y-1, z+1);
 			break;
 		case OS_MAPNIK:
+                case OS_CLOUDMADE:
 		case OS_OPENCYCLEMAP:
                 case OS_OPENCYCLEMAPTRANS:
 			sprintf(request, _url[s], 17-z, x, y);
