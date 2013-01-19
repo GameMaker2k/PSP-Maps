@@ -37,6 +37,9 @@
 #include <SDL_mixer.h>
 #include <curl/curl.h>
 
+#define DEFAULT_MAP 0
+#define DEFAULT_CHEAT_MAP 18
+
 #define BPP 32
 #define BUFFER_SIZE 200 * 1024
 #define MEMORY_CACHE_SIZE 32
@@ -84,7 +87,7 @@ char response[BUFFER_SIZE];
 int motion_loaded, gps_loaded, dat_loaded = 0;
 
 /* x, y, z are in Google's format: z = [ -4 .. 16 ], x and y = [ 1 .. 2^(17-z) ] */
-int z = 16, s = 4;
+int z = 16, s = DEFAULT_MAP;
 float x = 1, y = 1, dx, dy;
 int active = 0, fav = 0, balancing = 0, cache_zoom = 3;
 
@@ -768,7 +771,7 @@ void menu()
 									x = 1;
 									y = 1;
 									z = 16;
-									s = 0;
+									s = DEFAULT_MAP;
 									return;
 								/* infos */
 								case MENU_INFO:
@@ -825,8 +828,8 @@ void menu()
 								/* cheat */
 								case MENU_CHEAT:
 									config.cheat = !config.cheat;
-									s = 0;
-									if (config.cheat) s = NORMAL_VIEWS+1;
+									s = DEFAULT_MAP;
+									if (config.cheat) s = DEFAULT_CHEAT_MAP;
 									break;
 								/* disk cache */
 								case MENU_CACHESIZE:
@@ -909,8 +912,8 @@ void menu()
 								/* cheat */
 								case MENU_CHEAT:
 									config.cheat = !config.cheat;
-									s = 0;
-									if (config.cheat) s = NORMAL_VIEWS+1;
+									s = DEFAULT_MAP;
+									if (config.cheat) s = DEFAULT_CHEAT_MAP;
 									break;
 								/* disk cache */
 								case MENU_CACHESIZE:
@@ -965,8 +968,8 @@ void menu()
 								/* cheat */
 								case MENU_CHEAT:
 									config.cheat = !config.cheat;
-									s = 0;
-									if (config.cheat) s = NORMAL_VIEWS+1;
+									s = DEFAULT_MAP;
+									if (config.cheat) s = DEFAULT_CHEAT_MAP;
 									break;
 								/* disk cache */
 								case MENU_CACHESIZE:
@@ -1027,7 +1030,7 @@ void init()
 	}
 	
 	/* switch to sky if needed */
-	if (config.cheat) s = NORMAL_VIEWS+1;
+	if (config.cheat) s = DEFAULT_CHEAT_MAP;
 	
 	/* allocate disk cache */
 	disk = malloc(sizeof(struct _disk) * config.cache_size);
