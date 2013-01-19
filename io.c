@@ -12,40 +12,40 @@ void print(SDL_Surface *dst, int x, int y, char *text)
 	SDL_FreeSurface(src);
 }
 
+void input_update(SDL_Surface *dst, int x, int y, char *text, int flip)
+{
+	SDL_Rect pos;
+	int xx, yy;
+	char tmp;
+	
+	TTF_SizeText(font, text, &xx, &yy);
+	pos.x = x;
+	pos.y = y;
+	pos.w = WIDTH - x*2;
+	pos.h = yy;
+	SDL_FillRect(dst, &pos, BLACK);
+	
+	print(dst, x, y, text);
+	/* display blinking cursor */
+	if (flip / 5 % 2)
+	{
+		tmp = text[active];
+		text[active] = '\0';
+		TTF_SizeText(font, text, &xx, &yy);
+		print(dst, x+xx, y, "_");
+		text[active] = tmp;
+	}
+	flip++;
+	SDL_BlitSurface(dst, NULL, screen, NULL);
+	SDL_Flip(screen);
+}
+
 /* input text */
 void input(SDL_Surface *dst, int x, int y, char *text, int max)
 {
 	SDL_Event event;
 	int action, active = 0, flip;
 	int up = 0, down = 0;
-	
-	void update()
-	{
-		SDL_Rect pos;
-		int xx, yy;
-		char tmp;
-		
-		TTF_SizeText(font, text, &xx, &yy);
-		pos.x = x;
-		pos.y = y;
-		pos.w = WIDTH - x*2;
-		pos.h = yy;
-		SDL_FillRect(dst, &pos, BLACK);
-		
-		print(dst, x, y, text);
-		/* display blinking cursor */
-		if (flip / 5 % 2)
-		{
-			tmp = text[active];
-			text[active] = '\0';
-			TTF_SizeText(font, text, &xx, &yy);
-			print(dst, x+xx, y, "_");
-			text[active] = tmp;
-		}
-		flip++;
-		SDL_BlitSurface(dst, NULL, screen, NULL);
-		SDL_Flip(screen);
-	}
 	
 	#ifdef _PSP_FW_VERSION
 	/* danzeff */
@@ -95,7 +95,7 @@ void input(SDL_Surface *dst, int x, int y, char *text, int max)
 			}
 			
 			danzeff_render();
-			update();
+			input_update(dst, x, y, text, flip);
 			SDL_Delay(50);
 			
 			/* flush events */
@@ -200,7 +200,7 @@ void input(SDL_Surface *dst, int x, int y, char *text, int max)
 				else if (text[active] == '0') text[active] = 'Z';
 			}
 			if (down) down++;
-			update();
+			input_update(dst, x, y, text, flip);
 			SDL_Delay(50);
 		}
 	}

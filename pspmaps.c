@@ -639,6 +639,54 @@ void directions()
 	config.show_kml = 1;
 }
 
+void menu_update()
+{
+	SDL_Event event;
+	int action, cache_size = config.cache_size;
+	int i, j, k;
+	char temp[50];
+
+	#ifdef GP2X
+	#define MENU_LEFT 80
+	#else
+	#define MENU_LEFT 140
+	#endif
+	
+	#define MENU_TOP 60
+	#define MENU_BOTTOM 10
+	#define MENU_Y (HEIGHT - MENU_TOP - MENU_BOTTOM) / MENU_NUM
+	#define MAX_CACHEZOOM 9
+	#define MAX_CACHESIZE 32 * 1024 * 100
+	#define ENTRY(position, format...) sprintf(temp, format); print(next, MENU_LEFT, MENU_TOP + position * MENU_Y, temp);
+
+	SDL_Rect pos;
+	SDL_FillRect(next, NULL, BLACK);
+	pos.x = MENU_LEFT-80;
+	pos.y = 0;
+	SDL_BlitSurface(logo, NULL, next, &pos);
+	print(next, MENU_LEFT+120, 20, "version " VERSION);
+	print(next, MENU_LEFT+120, 35, "http://royale.zerezo.com/psp/");
+	print(next, MENU_LEFT-20, MENU_TOP + active * MENU_Y, ">");
+	ENTRY(MENU_VIEW, "Current view: %s", _view[s]);
+	ENTRY(MENU_ADDRESS, "Enter address...");
+	ENTRY(MENU_DIRECTIONS, "Get directions...");
+	ENTRY(MENU_LOAD, "Load favorite: (%d) %s", fav+1, favorite[fav].name);
+	ENTRY(MENU_SAVE, "Save favorite: (%d) %s", fav+1, favorite[fav].name);
+	ENTRY(MENU_DEFAULT, "Default view");
+	ENTRY(MENU_INFO, "Show informations: %s", config.show_info ? "Yes" : "No");
+	ENTRY(MENU_KML, "Show KML data: %s", config.show_kml ? "Yes" : "No");
+	ENTRY(MENU_GPS, "Center map on GPS: %s", config.follow_gps ? "Yes" : "No");
+	ENTRY(MENU_EFFECT, "Transition effects: %s", config.use_effects ? "Yes" : "No");
+	ENTRY(MENU_KEYBOARD, "Keyboard type: %s", config.danzeff ? "Danzeff" : "Arcade");
+	ENTRY(MENU_CACHEZOOM, "Cache zoom levels: %d", cache_zoom);
+	ENTRY(MENU_CHEAT, "Switch to sky/moon/mars: %s", config.cheat ? "Yes" : "No");
+	ENTRY(MENU_CACHESIZE, "Cache size: %d (~ %d MB)", cache_size, cache_size * 20 / 1000);
+	ENTRY(MENU_EXIT, "Exit menu");
+	ENTRY(MENU_QUIT, "Quit PSP-Maps");
+	SDL_BlitSurface(next, NULL, screen, NULL);
+	SDL_Flip(screen);
+}
+
 /* menu to load/save favorites */
 void menu()
 {
@@ -659,38 +707,7 @@ void menu()
 	#define MAX_CACHESIZE 32 * 1024 * 100
 	#define ENTRY(position, format...) sprintf(temp, format); print(next, MENU_LEFT, MENU_TOP + position * MENU_Y, temp);
 	
-	void update()
-	{
-		char temp[50];
-		SDL_Rect pos;
-		SDL_FillRect(next, NULL, BLACK);
-		pos.x = MENU_LEFT-80;
-		pos.y = 0;
-		SDL_BlitSurface(logo, NULL, next, &pos);
-		print(next, MENU_LEFT+120, 20, "version " VERSION);
-		print(next, MENU_LEFT+120, 35, "http://royale.zerezo.com/psp/");
-		print(next, MENU_LEFT-20, MENU_TOP + active * MENU_Y, ">");
-		ENTRY(MENU_VIEW, "Current view: %s", _view[s]);
-		ENTRY(MENU_ADDRESS, "Enter address...");
-		ENTRY(MENU_DIRECTIONS, "Get directions...");
-		ENTRY(MENU_LOAD, "Load favorite: (%d) %s", fav+1, favorite[fav].name);
-		ENTRY(MENU_SAVE, "Save favorite: (%d) %s", fav+1, favorite[fav].name);
-		ENTRY(MENU_DEFAULT, "Default view");
-		ENTRY(MENU_INFO, "Show informations: %s", config.show_info ? "Yes" : "No");
-		ENTRY(MENU_KML, "Show KML data: %s", config.show_kml ? "Yes" : "No");
-		ENTRY(MENU_GPS, "Center map on GPS: %s", config.follow_gps ? "Yes" : "No");
-		ENTRY(MENU_EFFECT, "Transition effects: %s", config.use_effects ? "Yes" : "No");
-		ENTRY(MENU_KEYBOARD, "Keyboard type: %s", config.danzeff ? "Danzeff" : "Arcade");
-		ENTRY(MENU_CACHEZOOM, "Cache zoom levels: %d", cache_zoom);
-		ENTRY(MENU_CHEAT, "Switch to sky/moon/mars: %s", config.cheat ? "Yes" : "No");
-		ENTRY(MENU_CACHESIZE, "Cache size: %d (~ %d MB)", cache_size, cache_size * 20 / 1000);
-		ENTRY(MENU_EXIT, "Exit menu");
-		ENTRY(MENU_QUIT, "Quit PSP-Maps");
-		SDL_BlitSurface(next, NULL, screen, NULL);
-		SDL_Flip(screen);
-	}
-	
-	update();
+	menu_update();
 	for (;;)
 	{
 		while (SDL_PollEvent(&event))
@@ -848,7 +865,7 @@ void menu()
 								case MENU_QUIT:
 									quit();
 							}
-							update();
+							menu_update();
 							break;
 						case SDLK_LEFT:
 						case PSP_BUTTON_LEFT:
@@ -904,7 +921,7 @@ void menu()
 									if (cache_size < 100) cache_size = 0;
 									break;
 							}
-							update();
+							menu_update();
 							break;
 						case SDLK_RIGHT:
 						case PSP_BUTTON_RIGHT:
@@ -960,19 +977,19 @@ void menu()
 									if (cache_size > MAX_CACHESIZE) cache_size = 0;
 									break;
 							}
-							update();
+							menu_update();
 							break;
 						case SDLK_UP:
 						case PSP_BUTTON_UP:
 							active--;
 							if (active < 0) active = MENU_NUM-1;
-							update();
+							menu_update();
 							break;
 						case SDLK_DOWN:
 						case PSP_BUTTON_DOWN:
 							active++;
 							if (active > MENU_NUM-1) active = 0;
-							update();
+							menu_update();
 							break;
 						default:
 							break;
