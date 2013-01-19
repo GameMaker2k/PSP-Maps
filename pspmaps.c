@@ -639,11 +639,8 @@ void directions()
 	config.show_kml = 1;
 }
 
-void menu_update()
+void menu_update(int cache_size)
 {
-	SDL_Event event;
-	int action, cache_size = config.cache_size;
-	int i, j, k;
 	char temp[50];
 
 	#ifdef GP2X
@@ -707,7 +704,7 @@ void menu()
 	#define MAX_CACHESIZE 32 * 1024 * 100
 	#define ENTRY(position, format...) sprintf(temp, format); print(next, MENU_LEFT, MENU_TOP + position * MENU_Y, temp);
 	
-	menu_update();
+	menu_update(cache_size);
 	for (;;)
 	{
 		while (SDL_PollEvent(&event))
@@ -865,7 +862,7 @@ void menu()
 								case MENU_QUIT:
 									quit();
 							}
-							menu_update();
+							menu_update(cache_size);
 							break;
 						case SDLK_LEFT:
 						case PSP_BUTTON_LEFT:
@@ -921,7 +918,7 @@ void menu()
 									if (cache_size < 100) cache_size = 0;
 									break;
 							}
-							menu_update();
+							menu_update(cache_size);
 							break;
 						case SDLK_RIGHT:
 						case PSP_BUTTON_RIGHT:
@@ -977,19 +974,19 @@ void menu()
 									if (cache_size > MAX_CACHESIZE) cache_size = 0;
 									break;
 							}
-							menu_update();
+							menu_update(cache_size);
 							break;
 						case SDLK_UP:
 						case PSP_BUTTON_UP:
 							active--;
 							if (active < 0) active = MENU_NUM-1;
-							menu_update();
+							menu_update(cache_size);
 							break;
 						case SDLK_DOWN:
 						case PSP_BUTTON_DOWN:
 							active++;
 							if (active > MENU_NUM-1) active = 0;
-							menu_update();
+							menu_update(cache_size);
 							break;
 						default:
 							break;

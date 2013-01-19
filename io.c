@@ -12,7 +12,7 @@ void print(SDL_Surface *dst, int x, int y, char *text)
 	SDL_FreeSurface(src);
 }
 
-void input_update(SDL_Surface *dst, int x, int y, char *text, int flip)
+void input_update(SDL_Surface *dst, int x, int y, char *text, int active, int flip)
 {
 	SDL_Rect pos;
 	int xx, yy;
@@ -35,7 +35,6 @@ void input_update(SDL_Surface *dst, int x, int y, char *text, int flip)
 		print(dst, x+xx, y, "_");
 		text[active] = tmp;
 	}
-	flip++;
 	SDL_BlitSurface(dst, NULL, screen, NULL);
 	SDL_Flip(screen);
 }
@@ -44,7 +43,7 @@ void input_update(SDL_Surface *dst, int x, int y, char *text, int flip)
 void input(SDL_Surface *dst, int x, int y, char *text, int max)
 {
 	SDL_Event event;
-	int action, active = 0, flip;
+	int action, active = 0, flip = 0;
 	int up = 0, down = 0;
 	
 	#ifdef _PSP_FW_VERSION
@@ -95,7 +94,8 @@ void input(SDL_Surface *dst, int x, int y, char *text, int max)
 			}
 			
 			danzeff_render();
-			input_update(dst, x, y, text, flip);
+			input_update(dst, x, y, text, active, flip);
+			flip++;
 			SDL_Delay(50);
 			
 			/* flush events */
@@ -200,7 +200,8 @@ void input(SDL_Surface *dst, int x, int y, char *text, int max)
 				else if (text[active] == '0') text[active] = 'Z';
 			}
 			if (down) down++;
-			input_update(dst, x, y, text, flip);
+			input_update(dst, x, y, text, active, flip);
+			flip++;
 			SDL_Delay(50);
 		}
 	}
