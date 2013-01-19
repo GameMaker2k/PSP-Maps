@@ -661,8 +661,9 @@ void menu_update(int cache_size)
 	pos.x = MENU_LEFT-80;
 	pos.y = 0;
 	SDL_BlitSurface(logo, NULL, next, &pos);
-	print(next, MENU_LEFT+120, 20, "version " VERSION);
-	print(next, MENU_LEFT+120, 35, "http://royale.zerezo.com/psp/");
+	print(next, MENU_LEFT+120, 10, "version " VERSION);
+	print(next, MENU_LEFT+120, 25, "http://royale.zerezo.com/psp/");
+	print(next, MENU_LEFT+120, 40, "http://github.com/GameMaker2k/");
 	print(next, MENU_LEFT-20, MENU_TOP + active * MENU_Y, ">");
 	ENTRY(MENU_VIEW, "Current view: %s", _view[s]);
 	ENTRY(MENU_ADDRESS, "Enter address...");
