@@ -16,6 +16,7 @@ http://tile2.opencyclemap.org/transport/%d/%d/%d.png
 http://otile1.mqcdn.com/tiles/1.0.0/osm/%d/%d/%d.jpg
 http://oatile1.mqcdn.com/naip/%d/%d/%d.jpg
 http://mw1.google.com/mw-planetary/lunar/lunarmaps_v1/apollo/%d/%d/%d.jpg
+http://mw1.google.com/mw-planetary/lunar/lunarmaps_v1/clem_bw/%d/%d/%d.jpg
 http://mw1.google.com/mw-planetary/lunar/lunarmaps_v1/terrain/%d/%d/%d.jpg
 http://mw1.google.com/mw-planetary/mars/elevation/%s.jpg
 http://mw1.google.com/mw-planetary/mars/visible/%s.jpg

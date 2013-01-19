@@ -166,6 +166,7 @@ SDL_RWops *getnet(int x, int y, int z, int s)
 			sprintf(request, _url[s], 17-z, x, y);
 			break;
 		case GG_MOON_APOLLO:
+		case GG_MOON_CLEMBW:
 		case GG_MOON_ELEVATION:
 			sprintf(request, _url[s], 17-z, x, (int) pow(2, 17-z)-y-1);
 			break;
